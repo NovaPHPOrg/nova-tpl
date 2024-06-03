@@ -4,13 +4,14 @@ namespace nova\plugin\tpl;
 
 use nova\framework\App;
 use nova\framework\request\Response;
+use nova\framework\request\ResponseType;
 
 class ViewResponse extends Response
 {
     /**
      * @var string $__layout 模板布局
      */
-    private ?string $__layout = "";
+    private string $__layout = "";
     /**
      * @var array $__data 模板数据
      */
@@ -32,25 +33,34 @@ class ViewResponse extends Response
      */
     private bool $__use_controller_structure = true;
 
-    private  ?ViewResponse $response = null;
+    private string $_static_dir = ROOT_PATH . DS . "runtime" . DS . "static";
+    private ?ViewResponse $response = null;
+
+    public function __construct(mixed $data = '', int $code = 200, ResponseType $type = ResponseType::HTML, array $header = [])
+    {
+        parent::__construct($data, $code, $type, $header);
+        if (!is_dir($this->_static_dir)) {
+            mkdir($this->_static_dir, 0777, true);
+        }
+    }
+
     private function getViewFile($view): string
     {
-        if($this->__use_controller_structure) {
+        if ($this->__use_controller_structure) {
             $req = App::getInstance()->getReq();
             $controller = $req->getController();
             $module = $req->getModule();
             $action = $req->getAction();
-            if($view == "") $view = $action ;
-            $view = $this->__template_dir . DS .  $module . DS . $controller . DS . $view.".tpl";
-        }else{
-            $view = $this->__template_dir . DS . $view.".tpl";
+            if ($view == "") $view = $action;
+            $view = $this->__template_dir . DS . $module . DS . $controller . DS . $view . ".tpl";
+        } else {
+            $view = $this->__template_dir . DS . $view . ".tpl";
         }
         return $view;
     }
 
 
-
-    public  function init($layout = "", $data = [],$__use_controller_structure = true, $left_delimiter= "{", $right_delimiter= "}",$__template_dir = ROOT_PATH.DS."app".DS."view".DS): void
+    public function init($layout = "", $data = [], $__use_controller_structure = true, $left_delimiter = "{", $right_delimiter = "}", $__template_dir = ROOT_PATH . DS . "app" . DS . "view" . DS): void
     {
         $this->__layout = $layout;
         $this->__data = $data;
@@ -61,27 +71,52 @@ class ViewResponse extends Response
     }
 
     private ?ViewCompile $viewCompile = null;
+
     /**
      * @throws ViewException
      */
-    public function asTpl(string $view, array $data = [], array $headers = []): Response
+    public function asTpl(string $view, bool $static = false, array $data = [], array $headers = []): Response
     {
-       $this->__data = array_merge($this->__data,$data);
 
-       $layout = "";
-       if($this->__layout != "") {
-           $layout = $this->getViewFile($this->__layout);
-       }
-       $view = $this->getViewFile($view);
+        $uri = App::getInstance()->getReq()->getUri();
+        $view = $this->getViewFile($view);
+        if ($static) {
+            $file = $this->checkStatic($view,$uri);
+            if($file!=null){
+                return self::asStatic($file, $headers);
+            }
+        }
+
+        $this->__data = array_merge($this->__data, $data);
+
+        $result = $this->dynamicCompilation($view);
+
+        if ($static) {
+            $this->static($uri,$result);
+        }
+
+        return self::asHtml($result, $headers);
+    }
+
+
+    /**
+     * @throws ViewException
+     */
+    private function dynamicCompilation($view): string
+    {
+        $layout = "";
+        if ($this->__layout != "") {
+            $layout = $this->getViewFile($this->__layout);
+        }
 
         try {
-            $this->viewCompile = new ViewCompile($view,$layout,ROOT_PATH.DS."runtime".DS."view", $this->__left_delimiter, $this->__right_delimiter);
+            $this->viewCompile = new ViewCompile($view, $layout, ROOT_PATH . DS . "runtime" . DS . "view", $this->__left_delimiter, $this->__right_delimiter);
 
-            $tplPath =  $this->viewCompile->getTplName();
+            $tplPath = $this->viewCompile->getTplName();
 
-            $complied_file =  $this->viewCompile->compile($tplPath);
+            $complied_file = $this->viewCompile->compile($tplPath);
 
-            $this->__data["__template_file"] =  $this->viewCompile->template_file;
+            $this->__data["__template_file"] = $this->viewCompile->template_file;
 
             ob_end_clean();
 
@@ -92,17 +127,33 @@ class ViewResponse extends Response
             include $complied_file;
 
             $result = ob_get_clean();
-        }catch (\Exception $e) {
+        } catch (\Exception $e) {
             throw new ViewException($e->getMessage());
         }
+        return $result;
+    }
 
-       return self::asHtml($result, $headers);
-   }
+    private function compile($tplFile): string
+    {
+        return $this->viewCompile->compile($tplFile);
+    }
 
-   private function compile($tplFile): string
-   {
-       return $this->viewCompile->compile($tplFile);
-   }
+    function checkStatic($tpl, $uri): ?string
+    {
+        $file = $this->_static_dir . DS . md5($uri) . ".html";
+        if (file_exists($file)) {
+            if (filemtime($file) > filemtime($tpl)) {
+                return $file;
+            }
+        }
+        return null;
+    }
+
+    function static($uri,$result): void
+    {
+        $path = $this->_static_dir . DS . md5($uri) . ".html";
+        file_put_contents($path, $result);
+    }
 
 
 }
