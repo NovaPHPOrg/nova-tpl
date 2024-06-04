@@ -5,6 +5,7 @@ namespace nova\plugin\tpl;
 use nova\framework\App;
 use nova\framework\request\Response;
 use nova\framework\request\ResponseType;
+use nova\framework\request\Route;
 
 class ViewResponse extends Response
 {
@@ -78,7 +79,7 @@ class ViewResponse extends Response
     public function asTpl(string $view, bool $static = false, array $data = [], array $headers = []): Response
     {
 
-        $uri = App::getInstance()->getReq()->getUri();
+        $uri = Route::$uri;
         $view = $this->getViewFile($view);
         if ($static) {
             $file = $this->checkStatic($view,$uri);
@@ -91,12 +92,15 @@ class ViewResponse extends Response
 
         $result = $this->dynamicCompilation($view);
 
+
+
         if ($static) {
             $this->static($uri,$result);
         }
 
         return self::asHtml($result, $headers);
     }
+
 
 
     /**
