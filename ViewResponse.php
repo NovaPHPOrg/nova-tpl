@@ -49,9 +49,9 @@ class ViewResponse extends Response
     {
         if ($this->__use_controller_structure) {
             $req = App::getInstance()->getReq();
-            $controller = $req->getController();
-            $module = $req->getModule();
-            $action = $req->getAction();
+            $controller = $req->route->controller;
+            $module = $req->route->module;
+            $action = $req->route->action;
             if ($view == "") $view = $action;
             $view = $this->__template_dir . DS . $module . DS . $controller . DS . $view . ".tpl";
         } else {
