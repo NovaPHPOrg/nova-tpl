@@ -78,6 +78,9 @@ class ViewResponse extends Response
      */
     public function asTpl(string $view, bool $static = false, array $data = [], array $headers = []): Response
     {
+        if(App::getInstance()->getReq()->isPjax()){
+            $static = false;
+        }
 
         $uri = Route::$uri;
         $view = $this->getViewFile($view);
@@ -89,7 +92,7 @@ class ViewResponse extends Response
         }
 
         $this->__data = array_merge($this->__data, $data);
-
+        $this->__data["__pjax"] = App::getInstance()->getReq()->isPjax();
         $result = $this->dynamicCompilation($view);
 
 
