@@ -91,10 +91,11 @@ class ViewResponse extends Response
         if ($static) {
             $hashCheck = true;
             if(!empty($this->__layout)){
-                $hash = $this->cache->get($this->__layout);
-                $layoutHash = md5_file($this->getViewFile($this->__layout));
+                $file = $this->getViewFile($this->__layout);
+                $hash = $this->cache->get($file);
+                $layoutHash = md5_file($file);
                 if($hash!=$layoutHash) {
-                    $this->cache->set($this->__layout, $hash);
+                    $this->cache->set($file, $layoutHash);
                     $hashCheck = false;
                 }
             }
