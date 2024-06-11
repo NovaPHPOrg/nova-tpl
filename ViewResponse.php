@@ -117,7 +117,7 @@ class ViewResponse extends Response
         }
 
         try {
-            $this->viewCompile = new ViewCompile($view, $layout, ROOT_PATH . DS . "runtime" . DS . "view", $this->__left_delimiter, $this->__right_delimiter);
+            $this->viewCompile = new ViewCompile($this->__template_dir,$view, $layout, ROOT_PATH . DS . "runtime" . DS . "view", $this->__left_delimiter, $this->__right_delimiter);
 
             $tplPath = $this->viewCompile->getTplName();
 

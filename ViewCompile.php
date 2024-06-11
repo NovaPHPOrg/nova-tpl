@@ -14,11 +14,14 @@ class ViewCompile
 
     public string $template_file = "";
 
+    public string $template_dir = "";
+
     /**
      * @throws ViewException
      */
-    public function __construct($template_name,$template_layout, $compile_path, $leftDelimiter = '{', $rightDelimiter = '}')
+    public function __construct($template_dir,$template_name,$template_layout, $compile_path, $leftDelimiter = '{', $rightDelimiter = '}')
     {
+        $this->template_dir = $template_dir;
         $this->template_name = $template_name;
         $this->compile_path = $compile_path;
         if (!is_dir($this->compile_path)) {
@@ -64,6 +67,14 @@ class ViewCompile
      */
     public function compile($tplFile):string
     {
+        //判断tplFile是否为绝对路径
+        if (!str_contains($tplFile, DS)) {
+            $tplFile = $this->template_dir .DS. $tplFile ;
+            if(!str_ends_with($tplFile,".tpl")){
+                $tplFile = $tplFile.".tpl";
+            }
+        }
+
         $compileFile = $this->compile_path . DS . md5($tplFile) . ".php";
         if (file_exists($compileFile)) {
             if (filemtime($tplFile) > filemtime($compileFile)) {
