@@ -84,8 +84,6 @@ class ViewResponse extends Response
     public function asTpl(string $view, bool $static = false, array $data = [], array $headers = []): Response
     {
         $pjax =  App::getInstance()->getReq()->isPjax();
-
-
         $uri = Route::$uri;
         $view = $this->getViewFile($view);
         if ($static) {
