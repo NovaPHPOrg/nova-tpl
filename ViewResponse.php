@@ -3,6 +3,7 @@
 namespace nova\plugin\tpl;
 
 use nova\framework\App;
+use nova\framework\cache\Cache;
 use nova\framework\request\Response;
 use nova\framework\request\ResponseType;
 use nova\framework\request\Route;
@@ -37,12 +38,16 @@ class ViewResponse extends Response
     private string $_static_dir = ROOT_PATH . DS . "runtime" . DS . "static";
     private ?ViewResponse $response = null;
 
+
+    private Cache $cache;
+
     public function __construct(mixed $data = '', int $code = 200, ResponseType $type = ResponseType::HTML, array $header = [])
     {
         parent::__construct($data, $code, $type, $header);
         if (!is_dir($this->_static_dir)) {
             mkdir($this->_static_dir, 0777, true);
         }
+        $this->cache = new Cache();
     }
 
     private function getViewFile($view): string
@@ -78,27 +83,38 @@ class ViewResponse extends Response
      */
     public function asTpl(string $view, bool $static = false, array $data = [], array $headers = []): Response
     {
-        if(App::getInstance()->getReq()->isPjax()){
-            $static = false;
-        }
+        $pjax =  App::getInstance()->getReq()->isPjax();
+
 
         $uri = Route::$uri;
         $view = $this->getViewFile($view);
         if ($static) {
-            $file = $this->checkStatic($view,$uri);
-            if($file!=null){
-                return self::asStatic($file, $headers);
+            $hashCheck = true;
+            if(!empty($this->__layout)){
+                $hash = $this->cache->get($this->__layout);
+                $layoutHash = md5_file($this->getViewFile($this->__layout));
+                if($hash!=$layoutHash) {
+                    $this->cache->set($this->__layout, $hash);
+                    $hashCheck = false;
+                }
             }
+            if($hashCheck){
+                $file = $this->checkStatic($view,$uri,$pjax);
+                if($file!=null){
+                    return self::asStatic($file, $headers);
+                }
+            }
+
         }
 
         $this->__data = array_merge($this->__data, $data);
-        $this->__data["__pjax"] = App::getInstance()->getReq()->isPjax();
+        $this->__data["__pjax"] = $pjax;
         $result = $this->dynamicCompilation($view);
 
 
 
         if ($static) {
-            $this->static($uri,$result);
+            $this->static($uri,$result,$pjax);
         }
 
         return self::asHtml($result, $headers);
@@ -145,9 +161,13 @@ class ViewResponse extends Response
         return $this->viewCompile->compile($tplFile);
     }
 
-    function checkStatic($tpl, $uri): ?string
+    function checkStatic($tpl, $uri,$pjax): ?string
     {
-        $file = $this->_static_dir . DS . md5($uri) . ".html";
+        $file = $this->_static_dir . DS . md5($uri) ;
+        if($pjax){
+            $file = $file."_pjax";
+        }
+        $file = $file . ".html";
         if (file_exists($file)) {
             if (filemtime($file) > filemtime($tpl)) {
                 return $file;
@@ -156,9 +176,13 @@ class ViewResponse extends Response
         return null;
     }
 
-    function static($uri,$result): void
+    function static($uri,$result,$pjax): void
     {
-        $path = $this->_static_dir . DS . md5($uri) . ".html";
+        $path = $this->_static_dir . DS . md5($uri);
+        if($pjax){
+            $path = $path."_pjax";
+        }
+        $path = $path . ".html";
         file_put_contents($path, $result);
     }
 
