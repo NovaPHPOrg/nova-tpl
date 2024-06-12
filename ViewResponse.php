@@ -88,21 +88,15 @@ class ViewResponse extends Response
         $view = $this->getViewFile($view);
         if ($static) {
             $hashCheck = true;
-
-            if (!empty($this->__layout)) {
+            if(!empty($this->__layout)){
                 $file = $this->getViewFile($this->__layout);
+                $hash = $this->cache->get($file);
                 $layoutHash = md5_file($file);
-
-                if ($this->cache->get($file) !== $layoutHash) {
-                    $this->cache->set($file, $layoutHash);
-                    $hashCheck = false;
-                }
+                $hashCheck = $hash==$layoutHash;
             }
-
-            if ($hashCheck) {
-                $file = $this->checkStatic($view, $uri, $pjax);
-
-                if ($file !== null) {
+            if($hashCheck){
+                $file = $this->checkStatic($view,$uri,$pjax);
+                if($file!=null){
                     return self::asStatic($file, $headers);
                 }
             }
@@ -117,6 +111,11 @@ class ViewResponse extends Response
 
         if ($static) {
             $this->static($uri,$result,$pjax);
+            if(!empty($this->__layout)) {
+                $file = $this->getViewFile($this->__layout);
+                $layoutHash = md5_file($file);
+                $this->cache->set($file, $layoutHash);
+            }
         }
 
         return self::asHtml($result, $headers);
