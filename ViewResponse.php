@@ -50,15 +50,19 @@ class ViewResponse extends Response
         $this->cache = new Cache();
     }
 
-    private function getViewFile($view): string
+    private function getViewFile($view,$layout = false): string
     {
-        if ($this->__use_controller_structure) {
+        if ( $this->__use_controller_structure) {
             $req = App::getInstance()->getReq();
             $controller = $req->route->controller;
             $module = $req->route->module;
             $action = $req->route->action;
             if ($view == "") $view = $action;
-            $view = $this->__template_dir . DS . $module . DS . $controller . DS . $view . ".tpl";
+            if($layout){
+                $view = $this->__template_dir . DS . $module  . DS . $view . ".tpl";
+            }else {
+                $view = $this->__template_dir . DS . $module . DS . $controller . DS . $view . ".tpl";
+            }
         } else {
             $view = $this->__template_dir . DS . $view . ".tpl";
         }
@@ -89,7 +93,7 @@ class ViewResponse extends Response
         if ($static) {
             $hashCheck = true;
             if(!empty($this->__layout)){
-                $file = $this->getViewFile($this->__layout);
+                $file = $this->getViewFile($this->__layout,true);
                 $hash = $this->cache->get($file);
                 $layoutHash = md5_file($file);
                 $hashCheck = $hash==$layoutHash;
@@ -112,7 +116,7 @@ class ViewResponse extends Response
         if ($static) {
             $this->static($uri,$result,$pjax);
             if(!empty($this->__layout)) {
-                $file = $this->getViewFile($this->__layout);
+                $file = $this->getViewFile($this->__layout,true);
                 $layoutHash = md5_file($file);
                 $this->cache->set($file, $layoutHash);
             }
@@ -130,7 +134,7 @@ class ViewResponse extends Response
     {
         $layout = "";
         if ($this->__layout != "") {
-            $layout = $this->getViewFile($this->__layout);
+            $layout = $this->getViewFile($this->__layout,true);
         }
 
         try {
