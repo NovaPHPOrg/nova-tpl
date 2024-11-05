@@ -61,7 +61,7 @@ class ViewResponse extends Response
             if($layout){
                 $view = $this->__template_dir . DS . $module  . DS . $view . ".tpl";
             }else {
-                $view = $this->__template_dir . DS . $module . DS . $controller . DS . $view . ".tpl";
+                $view = $this->__template_dir . DS . $module . DS . strtolower($controller) . DS . $view . ".tpl";
             }
         } else {
             $view = $this->__template_dir . DS . $view . ".tpl";
