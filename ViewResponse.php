@@ -99,7 +99,7 @@ class ViewResponse extends Response
                 $hashCheck = $hash==$layoutHash;
             }
             if($hashCheck){
-                $file = $this->checkStatic($view,$uri,$pjax);
+                $file = $this->checkStatic($view,$uri);
                 if($file!=null){
                     return self::asStatic($file, $headers);
                 }
@@ -109,12 +109,13 @@ class ViewResponse extends Response
 
         $this->__data = array_merge($this->__data, $data);
         $this->__data["__pjax"] = $pjax;
+        $this->__data["__debug"] = App::getInstance()->debug;
         $result = $this->dynamicCompilation($view);
 
 
 
         if ($static) {
-            $this->static($uri,$result,$pjax);
+            $this->static($uri,$view,$result);
             if(!empty($this->__layout)) {
                 $file = $this->getViewFile($this->__layout,true);
                 $layoutHash = md5_file($file);
@@ -166,12 +167,9 @@ class ViewResponse extends Response
         return $this->viewCompile->compile($tplFile);
     }
 
-    function checkStatic($tpl, $uri,$pjax): ?string
+    function checkStatic($tpl, $uri): ?string
     {
-        $file = $this->_static_dir . DS . md5($uri) ;
-        if($pjax){
-            $file = $file."_pjax";
-        }
+        $file = $this->_static_dir . DS . md5($uri,$tpl) ;
         $file = $file . ".html";
         if (file_exists($file)) {
             if (filemtime($file) > filemtime($tpl)) {
@@ -181,12 +179,9 @@ class ViewResponse extends Response
         return null;
     }
 
-    function static($uri,$result,$pjax): void
+    function static($uri,$view,$result): void
     {
-        $path = $this->_static_dir . DS . md5($uri);
-        if($pjax){
-            $path = $path."_pjax";
-        }
+        $path = $this->_static_dir . DS . md5($uri.$view);
         $path = $path . ".html";
         file_put_contents($path, $result);
     }
