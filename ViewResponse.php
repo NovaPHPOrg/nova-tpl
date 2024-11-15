@@ -170,7 +170,7 @@ class ViewResponse extends Response
 
     function checkStatic($tpl, $uri): ?string
     {
-        $file = $this->_static_dir . DS . md5($uri,$tpl) ;
+        $file = $this->_static_dir . DS . md5($uri . $tpl);
         $file = $file . ".html";
         if (file_exists($file)) {
             if (filemtime($file) > filemtime($tpl)) {

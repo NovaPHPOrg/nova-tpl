@@ -118,11 +118,11 @@ class ViewCompile
             '{~(.*?)}' => '<?php echo $1; ?>',
             '({((?!}).)*?)(\$[\w\"\'\[\]]+?)\.(\w+)(.*?})' => '$1$3[\'$4\']$5',
             '({.*?)(\$(\w+)@(index|iteration|first|last|total))+(.*?})' => '$1$_foreach_$3_$4$5',
-            '{(\$[\$\w\.\"\'\[\]]+?)\snofilter\s*}' => '<?php echo $1; ?>',
-            '{([\w\$\.\[\]\=\'"\s]+)\?(.*?:.*?)}' => '<?php echo $1?$2; ?>',
+            '{(\$[\$\w\.\"\'\[\]]+?)\snofilter\s*}' => '<?php echo strval($1); ?>',
+            '{([\w\$\.\[\]\=\'"\s]+)\?(.*?:.*?)}' => '<?php echo strval($1?$2); ?>',
 
             '{(\$[\$\w\"\'\[\]]+?)\s*=(.*?)\s*}' => '<?php $1=$2; ?>',
-            '{(\$[\$\w\.\"\'\[\]]+?)\s*}' => '<?php echo htmlspecialchars($1, ENT_QUOTES, "UTF-8"); ?>',
+            '{(\$[\$\w\.\"\'\[\]]+?)\s*}' => '<?php echo htmlspecialchars(strval($1), ENT_QUOTES, "UTF-8"); ?>',
 
             '{while\s*(.+?)}' => '<?php while ($1) : ?>',
             '{\/while}' => '<?php endwhile; ?>',
