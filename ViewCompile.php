@@ -99,7 +99,7 @@ class ViewCompile
     {
         $content = $this->_compile_struct($content);
         $content = $this->_compile_function($content);
-        $content = '<?php namespace nova\plugin\tpl; if(!class_exists("' . str_replace("\\", "\\\\", ViewResponse::class) . '", false)) exit("[ Nova ] Render Error. ");?>' . $content;
+        $content = '<?php declare(strict_types=1); namespace nova\plugin\tpl; if(!class_exists("' . str_replace("\\", "\\\\", ViewResponse::class) . '", false)) exit("[ Nova ] Render Error. ");?>' . $content;
         return $content;
     }
 
