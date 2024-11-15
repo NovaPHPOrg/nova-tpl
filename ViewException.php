@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 namespace nova\plugin\tpl;
 use nova\framework\log\Logger;
 use nova\framework\request\ControllerException;
