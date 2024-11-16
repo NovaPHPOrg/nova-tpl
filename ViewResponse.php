@@ -5,6 +5,7 @@ namespace nova\plugin\tpl;
 
 use nova\framework\App;
 use nova\framework\cache\Cache;
+use nova\framework\exception\AppExitException;
 use nova\framework\request\Response;
 use nova\framework\request\ResponseType;
 use nova\framework\request\Route;
@@ -158,6 +159,9 @@ class ViewResponse extends Response
 
             $result = ob_get_clean();
         } catch (\Exception $e) {
+            if ($e instanceof AppExitException) {
+                throw $e;
+            }
             throw new ViewException($e->getMessage());
         }
         return $result;
