@@ -9,6 +9,7 @@ use nova\framework\exception\AppExitException;
 use nova\framework\request\Response;
 use nova\framework\request\ResponseType;
 use nova\framework\request\Route;
+use function nova\framework\config;
 
 class ViewResponse extends Response
 {
@@ -112,6 +113,7 @@ class ViewResponse extends Response
         $this->__data = array_merge($this->__data, $data);
         $this->__data["__pjax"] = $pjax;
         $this->__data["__debug"] = App::getInstance()->debug;
+        $this->__data["__v"] = App::getInstance()->debug ? time() : config("version") ?? "";
         $result = $this->dynamicCompilation($view);
 
 
