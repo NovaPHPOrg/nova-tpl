@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace nova\plugin\tpl;
 
+use Exception;
 use nova\framework\App;
 use nova\framework\cache\Cache;
 use nova\framework\exception\AppExitException;
@@ -160,7 +161,7 @@ class ViewResponse extends Response
             include $complied_file;
 
             $result = ob_get_clean();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             if ($e instanceof AppExitException) {
                 throw $e;
             }
