@@ -4,12 +4,12 @@ declare(strict_types=1);
 namespace nova\plugin\tpl;
 
 use Exception;
-use nova\framework\App;
 use nova\framework\cache\Cache;
+use nova\framework\core\Context;
 use nova\framework\exception\AppExitException;
-use nova\framework\request\Response;
-use nova\framework\request\ResponseType;
-use nova\framework\request\Route;
+use nova\framework\http\Response;
+use nova\framework\http\ResponseType;
+use nova\framework\route\Route;
 use function nova\framework\config;
 
 class ViewResponse extends Response
@@ -45,6 +45,7 @@ class ViewResponse extends Response
 
     private Cache $cache;
 
+
     public function __construct(mixed $data = '', int $code = 200, ResponseType $type = ResponseType::HTML, array $header = [])
     {
         parent::__construct($data, $code, $type, $header);
@@ -52,15 +53,16 @@ class ViewResponse extends Response
             mkdir($this->_static_dir, 0777, true);
         }
         $this->cache = new Cache();
+        $this->init();
     }
 
     private function getViewFile($view,$layout = false): string
     {
         if ( $this->__use_controller_structure) {
-            $req = App::getInstance()->getReq();
-            $controller = $req->route->controller;
-            $module = $req->route->module;
-            $action = $req->route->action;
+            $route = Context::instance()->request()->getRoute();
+            $controller = $route->controller;
+            $module = $route->module;
+            $action = $route->action;
             if ($view == "") $view = $action;
             if($layout){
                 $view = $this->__template_dir . DS . $module  . DS . $view . ".tpl";
@@ -91,8 +93,8 @@ class ViewResponse extends Response
      */
     public function asTpl(string $view = "", bool $static = false, array $data = [], array $headers = []): Response
     {
-        $pjax =  App::getInstance()->getReq()->isPjax();
-        $uri = Route::$uri;
+        $pjax =  Context::instance()->request()->isPjax();
+        $uri = Route::getInstance()->getUri();
         $view = $this->getViewFile($view);
         if ($static) {
             $hashCheck = true;
@@ -113,8 +115,8 @@ class ViewResponse extends Response
 
         $this->__data = array_merge($this->__data, $data);
         $this->__data["__pjax"] = $pjax;
-        $this->__data["__debug"] = App::getInstance()->debug;
-        $this->__data["__v"] = App::getInstance()->debug ? time() : config("version") ?? "";
+        $this->__data["__debug"] = Context::instance()->isDebug();
+        $this->__data["__v"] = Context::instance()->isDebug() ? time() : config("version") ?? "";
         $result = $this->dynamicCompilation($view);
 
 
@@ -152,7 +154,6 @@ class ViewResponse extends Response
 
             $this->__data["__template_file"] = $this->viewCompile->template_file;
 
-            ob_end_clean();
 
             ob_start();
 
