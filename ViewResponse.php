@@ -56,23 +56,36 @@ class ViewResponse extends Response
         $this->init();
     }
 
-    private function getViewFile($view,$layout = false): string
+    /**
+     * 按优先级从不同位置查找视图文件
+     * @param string $view 视图名称
+     * @return string 返回找到的第一个视图文件路径
+     * @throws ViewException 当视图文件都不存在时抛出异常
+     */
+    private function getViewFile(string $view): string
     {
-        if ( $this->__use_controller_structure) {
-            $route = Context::instance()->request()->getRoute();
-            $controller = $route->controller;
-            $module = $route->module;
-            $action = $route->action;
-            if ($view == "") $view = $action;
-            if($layout){
-                $view = $this->__template_dir . DS . $module  . DS . $view . ".tpl";
-            }else {
-                $view = $this->__template_dir . DS . $module . DS . strtolower($controller) . DS . $view . ".tpl";
+        $route = Context::instance()->request()->getRoute();
+        $controller = $route->controller;
+        $module = $route->module;
+        
+        if ($view == "") $view = $route->action;
+
+        // 构建三个优先级的视图文件路径
+        $paths = [
+            $this->__template_dir . DS . $module . DS . strtolower($controller) . DS . $view . ".tpl",  // 模块/控制器/视图
+            $this->__template_dir . DS . $module . DS . $view . ".tpl",  // 模块/视图
+            $this->__template_dir . DS . $view . ".tpl"  // 直接在模板根目录
+        ];
+
+        // 依次检查文件是否存在
+        foreach ($paths as $path) {
+            if (file_exists($path)) {
+                return $path;
             }
-        } else {
-            $view = $this->__template_dir . DS . $view . ".tpl";
         }
-        return $view;
+
+        // 如果都不存在，抛出异常
+        throw new ViewException("视图文件 '{$view}' 不存在");
     }
 
 
@@ -99,7 +112,7 @@ class ViewResponse extends Response
         if ($static) {
             $hashCheck = true;
             if(!empty($this->__layout)){
-                $file = $this->getViewFile($this->__layout,true);
+                $file = $this->getViewFile($this->__layout);
                 $hash = $this->cache->get($file);
                 $layoutHash = md5_file($file);
                 $hashCheck = $hash==$layoutHash;
@@ -124,7 +137,7 @@ class ViewResponse extends Response
         if ($static) {
             $this->static($uri,$view,$result);
             if(!empty($this->__layout)) {
-                $file = $this->getViewFile($this->__layout,true);
+                $file = $this->getViewFile($this->__layout);
                 $layoutHash = md5_file($file);
                 $this->cache->set($file, $layoutHash);
             }
@@ -142,7 +155,7 @@ class ViewResponse extends Response
     {
         $layout = "";
         if ($this->__layout != "") {
-            $layout = $this->getViewFile($this->__layout,true);
+            $layout = $this->getViewFile($this->__layout);
         }
 
         try {
