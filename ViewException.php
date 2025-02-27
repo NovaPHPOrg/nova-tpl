@@ -1,4 +1,5 @@
 <?php
+
 /*
  * Copyright (c) 2025. Lorem ipsum dolor sit amet, consectetur adipiscing elit.
  * Morbi non lorem porttitor neque feugiat blandit. Ut vitae ipsum eget quam lacinia accumsan.
@@ -8,6 +9,7 @@
  */
 
 declare(strict_types=1);
+
 namespace nova\plugin\tpl;
 
 use nova\framework\core\Logger;
@@ -24,7 +26,7 @@ class ViewException extends ControllerException
         $this->tpl = $tpl;
     }
 
-    function getTpl():string
+    public function getTpl(): string
     {
         return $this->tpl;
     }

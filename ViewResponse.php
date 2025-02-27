@@ -1,4 +1,5 @@
 <?php
+
 /*
  * Copyright (c) 2025. Lorem ipsum dolor sit amet, consectetur adipiscing elit.
  * Morbi non lorem porttitor neque feugiat blandit. Ut vitae ipsum eget quam lacinia accumsan.
@@ -13,12 +14,15 @@ namespace nova\plugin\tpl;
 
 use Exception;
 use nova\framework\cache\Cache;
+
+use function nova\framework\config;
+
 use nova\framework\core\Context;
 use nova\framework\exception\AppExitException;
 use nova\framework\http\Response;
 use nova\framework\http\ResponseType;
+
 use nova\framework\route\Route;
-use function nova\framework\config;
 
 class ViewResponse extends Response
 {
@@ -50,9 +54,7 @@ class ViewResponse extends Response
     private string $_static_dir = ROOT_PATH . DS . "runtime" . DS . "static";
     private ?ViewResponse $response = null;
 
-
     private Cache $cache;
-
 
     public function __construct(mixed $data = '', int $code = 200, ResponseType $type = ResponseType::HTML, array $header = [])
     {
@@ -66,8 +68,8 @@ class ViewResponse extends Response
 
     /**
      * 按优先级从不同位置查找视图文件
-     * @param string $view 视图名称
-     * @return string 返回找到的第一个视图文件路径
+     * @param  string        $view 视图名称
+     * @return string        返回找到的第一个视图文件路径
      * @throws ViewException 当视图文件都不存在时抛出异常
      */
     private function getViewFile(string $view): string
@@ -75,8 +77,10 @@ class ViewResponse extends Response
         $route = Context::instance()->request()->getRoute();
         $controller = $route->controller;
         $module = $route->module;
-        
-        if ($view == "") $view = $route->action;
+
+        if ($view == "") {
+            $view = $route->action;
+        }
 
         // 构建三个优先级的视图文件路径
         $paths = [
@@ -95,7 +99,6 @@ class ViewResponse extends Response
         // 如果都不存在，抛出异常
         throw new ViewException("视图文件 '{$view}' 不存在");
     }
-
 
     public function init($layout = "", $data = [], $__use_controller_structure = true, $left_delimiter = "{", $right_delimiter = "}", $__template_dir = ROOT_PATH . DS . "app" . DS . "view" . DS): void
     {
@@ -119,15 +122,15 @@ class ViewResponse extends Response
         $view = $this->getViewFile($view);
         if ($static) {
             $hashCheck = true;
-            if(!empty($this->__layout)){
+            if (!empty($this->__layout)) {
                 $file = $this->getViewFile($this->__layout);
                 $hash = $this->cache->get($file);
                 $layoutHash = md5_file($file);
-                $hashCheck = $hash==$layoutHash;
+                $hashCheck = $hash == $layoutHash;
             }
-            if($hashCheck){
-                $file = $this->checkStatic($view,$uri);
-                if($file!=null){
+            if ($hashCheck) {
+                $file = $this->checkStatic($view, $uri);
+                if ($file != null) {
                     return self::asStatic($file, $headers);
                 }
             }
@@ -140,11 +143,9 @@ class ViewResponse extends Response
         $this->__data["__v"] = Context::instance()->isDebug() ? time() : config("version") ?? "";
         $result = $this->dynamicCompilation($view);
 
-
-
         if ($static) {
-            $this->static($uri,$view,$result);
-            if(!empty($this->__layout)) {
+            $this->static($uri, $view, $result);
+            if (!empty($this->__layout)) {
                 $file = $this->getViewFile($this->__layout);
                 $layoutHash = md5_file($file);
                 $this->cache->set($file, $layoutHash);
@@ -153,8 +154,6 @@ class ViewResponse extends Response
 
         return self::asHtml($result, $headers);
     }
-
-
 
     /**
      * @throws ViewException
@@ -167,14 +166,13 @@ class ViewResponse extends Response
         }
 
         try {
-            $this->viewCompile = new ViewCompile($this->__template_dir,$view, $layout, ROOT_PATH . DS . "runtime" . DS . "view", $this->__left_delimiter, $this->__right_delimiter);
+            $this->viewCompile = new ViewCompile($this->__template_dir, $view, $layout, ROOT_PATH . DS . "runtime" . DS . "view", $this->__left_delimiter, $this->__right_delimiter);
 
             $tplPath = $this->viewCompile->getTplName();
 
             $complied_file = $this->viewCompile->compile($tplPath);
 
             $this->__data["__template_file"] = $this->viewCompile->template_file;
-
 
             ob_start();
 
@@ -197,7 +195,7 @@ class ViewResponse extends Response
         return $this->viewCompile->compile($tplFile);
     }
 
-    function checkStatic($tpl, $uri): ?string
+    public function checkStatic($tpl, $uri): ?string
     {
         $file = $this->_static_dir . DS . md5($uri . $tpl);
         $file = $file . ".html";
@@ -209,12 +207,11 @@ class ViewResponse extends Response
         return null;
     }
 
-    function static($uri,$view,$result): void
+    public function static($uri, $view, $result): void
     {
         $path = $this->_static_dir . DS . md5($uri.$view);
         $path = $path . ".html";
         file_put_contents($path, $result);
     }
-
 
 }

@@ -1,4 +1,5 @@
 <?php
+
 /*
  * Copyright (c) 2025. Lorem ipsum dolor sit amet, consectetur adipiscing elit.
  * Morbi non lorem porttitor neque feugiat blandit. Ut vitae ipsum eget quam lacinia accumsan.
@@ -8,6 +9,7 @@
  */
 
 declare(strict_types=1);
+
 namespace nova\plugin\tpl;
 
 use nova\framework\core\Logger;
@@ -29,7 +31,7 @@ class ViewCompile
     /**
      * @throws ViewException
      */
-    public function __construct($template_dir,$template_name,$template_layout, $compile_path, $leftDelimiter = '{', $rightDelimiter = '}')
+    public function __construct($template_dir, $template_name, $template_layout, $compile_path, $leftDelimiter = '{', $rightDelimiter = '}')
     {
         $this->template_dir = $template_dir;
         $this->template_name = $template_name;
@@ -53,10 +55,10 @@ class ViewCompile
      * @return void
      * @throws ViewException
      */
-    private function preCompileLayout():void
+    private function preCompileLayout(): void
     {
         if (!empty($this->template_layout)) {
-            if ($this->template_name === $this->template_layout){
+            if ($this->template_name === $this->template_layout) {
                 throw new ViewException("Layout can't be the same as the view file: $this->template_name");
             }
             $this->template_file = $this->template_name;
@@ -64,23 +66,22 @@ class ViewCompile
         }
     }
 
-    public function getTplName():string
+    public function getTplName(): string
     {
         return $this->template_name;
     }
 
-
     /**
      * 编译模板
-     * @param $tplFile
+     * @param         $tplFile
      * @return string
      */
-    public function compile($tplFile):string
+    public function compile($tplFile): string
     {
         //判断tplFile是否为绝对路径
         if (!str_contains($tplFile, DS)) {
             $tplFile = $this->template_dir .DS. $tplFile ;
-            if(!str_ends_with($tplFile,".tpl")){
+            if (!str_ends_with($tplFile, ".tpl")) {
                 $tplFile = $tplFile.".tpl";
             }
         }
@@ -89,22 +90,22 @@ class ViewCompile
         if (file_exists($compileFile)) {
             if (filemtime($tplFile) > filemtime($compileFile)) {
                 //如果源文件的修改时间大于编译文件的修改时间，重新编译
-                $this->compileFile($tplFile,$compileFile);
+                $this->compileFile($tplFile, $compileFile);
             }
-        }else{
-            $this->compileFile($tplFile,$compileFile);
+        } else {
+            $this->compileFile($tplFile, $compileFile);
         }
         return $compileFile;
     }
 
-    private function compileFile(string $tplFile,string $compileFile): void
+    private function compileFile(string $tplFile, string $compileFile): void
     {
         $content = file_get_contents($tplFile);
         $content = $this->compileContent($content);
         file_put_contents($compileFile, $content);
     }
 
-    private function compileContent(string $content):string
+    private function compileContent(string $content): string
     {
         $content = $this->_compile_struct($content);
         $content = $this->_compile_function($content);
@@ -112,10 +113,9 @@ class ViewCompile
         return $content;
     }
 
-
     /**
      * 翻译模板语法
-     * @param string $template_data
+     * @param  string $template_data
      * @return string
      */
     private function _compile_struct(string $template_data): string
@@ -163,7 +163,7 @@ class ViewCompile
     }
     /**
      * 函数编译
-     * @param string $template_data
+     * @param  string               $template_data
      * @return string|string[]|null
      */
     private function _compile_function(string $template_data): array|string|null
@@ -172,16 +172,17 @@ class ViewCompile
         return preg_replace_callback($pattern, [$this, '_compile_function_callback'], $template_data);
     }
 
-
     /**
      * 函数回调
-     * @param $matches
+     * @param                       $matches
      * @return string|string[]|null
      */
     private function _compile_function_callback($matches): array|string|null
     {
 
-        if (empty($matches[2])) return '<?php echo ' . $matches[1] . '();?>';
+        if (empty($matches[2])) {
+            return '<?php echo ' . $matches[1] . '();?>';
+        }
 
         if ($matches[1] !== "unset") {
             $replace = '<?php echo ' . $matches[1] . '($1);?>';
@@ -189,12 +190,16 @@ class ViewCompile
             $replace = '<?php  ' . $matches[1] . '($1);?>';
         }
         $sync = preg_replace('/\((.*)\)\s*$/', $replace, $matches[2], -1, $count);
-        if ($count) return $sync;
+        if ($count) {
+            return $sync;
+        }
 
         $pattern_inner = '/\b([-\w]+?)\s*=\s*(\$[\w"\'\]\[\-_>\$]+|"[^"\\\\]*(?:\\\\.[^"\\\\]*)*"|\'[^\'\\\\]*(?:\\\\.[^\'\\\\]*)*\'|([->\w]+))\s*?/';
         if (preg_match_all($pattern_inner, $matches[2], $matches_inner, PREG_SET_ORDER)) {
             $params = "array(";
-            foreach ($matches_inner as $m) $params .= '\'' . $m[1] . "'=>" . $m[2] . ", ";
+            foreach ($matches_inner as $m) {
+                $params .= '\'' . $m[1] . "'=>" . $m[2] . ", ";
+            }
             $params .= ")";
             return '<?php echo ' . $matches[1] . '(' . $params . ');?>';
         }
