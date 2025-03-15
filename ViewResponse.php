@@ -75,28 +75,36 @@ class ViewResponse extends Response
     private function getViewFile(string $view): string
     {
         $route = Context::instance()->request()->getRoute();
-        $controller = $route->controller;
-        $module = $route->module;
 
-        if ($view == "") {
-            $view = $route->action;
+        // 初始化路径数组
+        $paths = [];
+
+        // 确保 route 存在，否则跳过模块 & 控制器级别的路径
+        if ($route !== null) {
+            $controller = $route->controller;
+            $module = $route->module;
+
+            // 如果 $view 为空，确保 route 不为空
+            if ($view === "") {
+                $view = $route->action ?? "";
+            }
+
+            // 添加高优先级路径
+            $paths[] = $this->__template_dir . DS . $module . DS . strtolower($controller) . DS . $view . ".tpl";
+            $paths[] = $this->__template_dir . DS . $module . DS . $view . ".tpl";
         }
 
-        // 构建三个优先级的视图文件路径
-        $paths = [
-            $this->__template_dir . DS . $module . DS . strtolower($controller) . DS . $view . ".tpl",  // 模块/控制器/视图
-            $this->__template_dir . DS . $module . DS . $view . ".tpl",  // 模块/视图
-            $this->__template_dir . DS . $view . ".tpl"  // 直接在模板根目录
-        ];
+        // 添加基础路径（如果 route 为空，也至少有这个路径）
+        $paths[] = $this->__template_dir . DS . $view . ".tpl";
 
-        // 依次检查文件是否存在
+        // 查找视图文件
         foreach ($paths as $path) {
             if (file_exists($path)) {
                 return $path;
             }
         }
 
-        // 如果都不存在，抛出异常
+        // 如果所有路径都找不到，抛出异常
         throw new ViewException("视图文件 '{$view}' 不存在");
     }
 
