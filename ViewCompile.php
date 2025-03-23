@@ -123,31 +123,43 @@ class ViewCompile
         $foreach_inner_before = '<?php if(!empty($1)){ $_foreach_$3_counter = 0; $_foreach_$3_total = count($1);?>';
         $foreach_inner_after = '<?php $_foreach_$3_index = $_foreach_$3_counter;$_foreach_$3_iteration = $_foreach_$3_counter + 1;$_foreach_$3_first = ($_foreach_$3_counter == 0);$_foreach_$3_last = ($_foreach_$3_counter == $_foreach_$3_total - 1);$_foreach_$3_counter++;?>';
         $pattern_map = [
+            // 1) 模板注释
             '{\*([\s\S]+?)\*}' => '<?php /* $1*/?>',
+            // 2) 原始输出：{~ ... }
             '{~(.*?)}' => '<?php echo $1; ?>',
+            // 3) 点语法转换：{$foo.bar} => {$foo['bar']}
             '({((?!}).)*?)(\$[\w\"\'\[\]]+?)\.(\w+)(.*?})' => '$1$3[\'$4\']$5',
+            // 4) foreach 内部的 @index / @iteration / ...
             '({.*?)(\$(\w+)@(index|iteration|first|last|total))+(.*?})' => '$1$_foreach_$3_$4$5',
+            // 5) 对象属性输出
+            '{(\$[\w\-_]+\->[\w\-_]+)}' => '<?php echo strval($1); ?>',
+            // 6) nofilter 输出
             '{(\$[\$\w\.\"\'\[\]]+?)\snofilter\s*}' => '<?php echo strval($1); ?>',
+            // 7) 三元运算
             '{([\w\$\.\[\]\=\'"\s]+)\?(.*?:.*?)}' => '<?php echo strval($1?$2); ?>',
-
+            // 8) 赋值语句
             '{(\$[\$\w\"\'\[\]]+?)\s*=(.*?)\s*}' => '<?php $1=$2; ?>',
+            // 10) 默认安全输出
             '{(\$[\$\w\.\"\'\[\]]+?)\s*}' => '<?php echo htmlspecialchars(strval($1), ENT_QUOTES, "UTF-8"); ?>',
-
+// 11) while 结构
             '{while\s*(.+?)}' => '<?php while ($1) : ?>',
-            '{\/while}' => '<?php endwhile; ?>',
 
+            '{\/while}' => '<?php endwhile; ?>',
+            // 12) if/elseif/else 结构
             '{if\s*(.+?)}' => '<?php if ($1) : ?>',
 
             '{else\s*if\s*(.+?)}' => '<?php elseif ($1) : ?>',
             '{else}' => '<?php else : ?>',
+            '{\/if}' => '<?php endif; ?>',
+            // 13) break / continue
             '{break}' => '<?php break; ?>',
             '{continue}' => '<?php continue; ?>',
+            // 14) foreach 结构
 
-            '{\/if}' => '<?php endif; ?>',
             '{foreach\s*(\$[\$\w\.\"\'\[\]]+?)\s*as(\s*)\$([\w\"\'\[\]]+?)}' => $foreach_inner_before . '<?php foreach( $1 as $$3 ) : ?>' . $foreach_inner_after,
             '{foreach\s*(\$[\$\w\.\"\'\[\]_]+?)\s*as\s*(\$[\w\"\'\[\]]+?)\s*=>\s*\$([\w\"\'\[\]]+?)}' => $foreach_inner_before . '<?php foreach( $1 as $2 => $$3 ) : ?>' . $foreach_inner_after,
             '{\/foreach}' => '<?php endforeach; }?>',
-
+            // 15) include 语法
             '{include\s*file=(.+?)}' => '<?php include $this->compile($1); ?>',
         ];
 
