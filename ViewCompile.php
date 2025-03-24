@@ -141,7 +141,7 @@ class ViewCompile
             '{(\$[\$\w\"\'\[\]]+?)\s*=(.*?)\s*}' => '<?php $1=$2; ?>',
             // 10) 默认安全输出
             '{(\$[\$\w\.\"\'\[\]]+?)\s*}' => '<?php echo htmlspecialchars(strval($1), ENT_QUOTES, "UTF-8"); ?>',
-// 11) while 结构
+            // 11) while 结构
             '{while\s*(.+?)}' => '<?php while ($1) : ?>',
 
             '{\/while}' => '<?php endwhile; ?>',
