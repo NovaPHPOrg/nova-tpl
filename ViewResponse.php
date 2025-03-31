@@ -62,7 +62,7 @@ class ViewResponse extends Response
         if (!is_dir($this->_static_dir)) {
             mkdir($this->_static_dir, 0777, true);
         }
-        $this->cache = new Cache();
+        $this->cache = Context::instance()->cache;
         $this->init();
     }
 
