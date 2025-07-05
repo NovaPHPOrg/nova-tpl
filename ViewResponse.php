@@ -15,6 +15,7 @@ namespace nova\plugin\tpl;
 use Exception;
 use nova\framework\cache\Cache;
 
+use nova\framework\core\Logger;
 use function nova\framework\config;
 
 use nova\framework\core\Context;
@@ -46,15 +47,10 @@ class ViewResponse extends Response
      * @var string $__template_dir 模板目录
      */
     private string $__template_dir = "";
-    /**
-     * @var bool $__use_controller_structure 是否使用控制器结构
-     */
-    private bool $__use_controller_structure = true;
+
 
     private string $_static_dir = ROOT_PATH . DS . "runtime" . DS . "static";
-    private ?ViewResponse $response = null;
 
-    private Cache $cache;
 
     public function __construct(mixed $data = '', int $code = 200, ResponseType $type = ResponseType::HTML, array $header = [])
     {
@@ -62,7 +58,6 @@ class ViewResponse extends Response
         if (!is_dir($this->_static_dir)) {
             mkdir($this->_static_dir, 0777, true);
         }
-        $this->cache = Context::instance()->cache;
         $this->init();
     }
 
@@ -108,14 +103,13 @@ class ViewResponse extends Response
         throw new ViewException("视图文件 '{$view}' 不存在");
     }
 
-    public function init($layout = "", $data = [], $__use_controller_structure = true, $left_delimiter = "{", $right_delimiter = "}", $__template_dir = ROOT_PATH . DS . "app" . DS . "view" . DS): void
+    public function init($layout = "", $data = [], $left_delimiter = "{", $right_delimiter = "}", $__template_dir = ROOT_PATH . DS . "app" . DS . "view" . DS): void
     {
         $this->__layout = $layout;
         $this->__data = $data;
         $this->__left_delimiter = $left_delimiter;
         $this->__right_delimiter = $right_delimiter;
         $this->__template_dir = $__template_dir;
-        $this->__use_controller_structure = $__use_controller_structure;
     }
 
     private ?ViewCompile $viewCompile = null;
@@ -123,42 +117,17 @@ class ViewResponse extends Response
     /**
      * @throws ViewException
      */
-    public function asTpl(string $view = "", bool $static = false, array $data = [], array $headers = []): Response
+    public function asTpl(string $view = "", array $data = [], array $headers = []): Response
     {
         $pjax =  Context::instance()->request()->isPjax();
-        $uri = Route::getInstance()->getUri();
         $view = $this->getViewFile($view);
-        if ($static) {
-            $hashCheck = true;
-            if (!empty($this->__layout)) {
-                $file = $this->getViewFile($this->__layout);
-                $hash = $this->cache->get($file);
-                $layoutHash = md5_file($file);
-                $hashCheck = $hash == $layoutHash;
-            }
-            if ($hashCheck) {
-                $file = $this->checkStatic($view, $uri);
-                if ($file != null) {
-                    return self::asStatic($file, $headers);
-                }
-            }
 
-        }
 
         $this->__data = array_merge($this->__data, $data);
         $this->__data["__pjax"] = $pjax;
         $this->__data["__debug"] = Context::instance()->isDebug();
         $this->__data["__v"] = Context::instance()->isDebug() ? time() : config("version") ?? "";
         $result = $this->dynamicCompilation($view);
-
-        if ($static) {
-            $this->static($uri, $view, $result);
-            if (!empty($this->__layout)) {
-                $file = $this->getViewFile($this->__layout);
-                $layoutHash = md5_file($file);
-                $this->cache->set($file, $layoutHash);
-            }
-        }
 
         return self::asHtml($result, $headers);
     }
@@ -203,23 +172,5 @@ class ViewResponse extends Response
         return $this->viewCompile->compile($tplFile);
     }
 
-    public function checkStatic($tpl, $uri): ?string
-    {
-        $file = $this->_static_dir . DS . md5($uri . $tpl);
-        $file = $file . ".html";
-        if (file_exists($file)) {
-            if (filemtime($file) > filemtime($tpl)) {
-                return $file;
-            }
-        }
-        return null;
-    }
-
-    public function static($uri, $view, $result): void
-    {
-        $path = $this->_static_dir . DS . md5($uri.$view);
-        $path = $path . ".html";
-        file_put_contents($path, $result);
-    }
 
 }
