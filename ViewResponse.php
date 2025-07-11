@@ -13,9 +13,7 @@ declare(strict_types=1);
 namespace nova\plugin\tpl;
 
 use Exception;
-use nova\framework\cache\Cache;
 
-use nova\framework\core\Logger;
 use function nova\framework\config;
 
 use nova\framework\core\Context;
@@ -48,9 +46,7 @@ class ViewResponse extends Response
      */
     private string $__template_dir = "";
 
-
     private string $_static_dir = ROOT_PATH . DS . "runtime" . DS . "static";
-
 
     public function __construct(mixed $data = '', int $code = 200, ResponseType $type = ResponseType::HTML, array $header = [])
     {
@@ -122,7 +118,6 @@ class ViewResponse extends Response
         $pjax =  Context::instance()->request()->isPjax();
         $view = $this->getViewFile($view);
 
-
         $this->__data = array_merge($this->__data, $data);
         $this->__data["__pjax"] = $pjax;
         $this->__data["__debug"] = Context::instance()->isDebug();
@@ -171,6 +166,5 @@ class ViewResponse extends Response
     {
         return $this->viewCompile->compile($tplFile);
     }
-
 
 }
