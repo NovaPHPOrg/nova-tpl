@@ -76,25 +76,52 @@ class ViewCompile
      * @param         $tplFile
      * @return string
      */
-    public function compile($tplFile): string
+    /**
+     * 编译模板（若已编译且未过期则复用）。
+     * 1. 支持相对名称 -> 绝对路径解析
+     * 2. 支持缺失时向父目录逐层搜索（最多 3 层）
+     * 3. 统一判断是否需要重新编译
+     */
+    public function compile(string $tplFile): string
     {
-        //判断tplFile是否为绝对路径
+        // ① 若传入的是相对路径（不含目录分隔符），补全模板目录及扩展名
         if (!str_contains($tplFile, DS)) {
-            $tplFile = $this->template_dir .DS. $tplFile ;
-            if (!str_ends_with($tplFile, ".tpl")) {
-                $tplFile = $tplFile.".tpl";
+            $tplFile = $this->template_dir . DS . rtrim($tplFile, DS);
+            if (!str_ends_with($tplFile, '.tpl')) {
+                $tplFile .= '.tpl';
             }
         }
 
-        $compileFile = $this->compile_path . DS . md5($tplFile) . ".php";
-        if (file_exists($compileFile)) {
-            if (filemtime($tplFile) > filemtime($compileFile)) {
-                //如果源文件的修改时间大于编译文件的修改时间，重新编译
-                $this->compileFile($tplFile, $compileFile);
+        // ② 若文件不存在，则向上查找 ≤3 层
+        if (!file_exists($tplFile)) {
+            $pathInfo = pathinfo($tplFile);
+            $dir      = $pathInfo['dirname'];
+            $base     = $pathInfo['basename'];
+            $found    = false;
+
+            for ($i = 0; $i < 3 && $dir !== DS; $i++) {
+                $dir       = dirname($dir);           // 上移一层
+                $candidate = $dir . DS . $base;
+                if (file_exists($candidate)) {
+                    $tplFile = $candidate;
+                    $found   = true;
+                    break;
+                }
             }
-        } else {
+
+            if (!$found) {
+                throw new \RuntimeException("Template not found within 3 parent levels: {$base}");
+            }
+        }
+
+        // ③ 目标编译文件路径 = md5(模板绝对路径).php
+        $compileFile = $this->compile_path . DS . md5($tplFile) . '.php';
+
+        // ④ 若未编译过或源文件更新过，则触发编译
+        if (!file_exists($compileFile) || filemtime($tplFile) > filemtime($compileFile)) {
             $this->compileFile($tplFile, $compileFile);
         }
+
         return $compileFile;
     }
 

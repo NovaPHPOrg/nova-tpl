@@ -96,7 +96,7 @@ class ViewResponse extends Response
         }
 
         // 如果所有路径都找不到，抛出异常
-        throw new ViewException("视图文件 '{$view}' 不存在");
+        throw new ViewException("视图文件 '{$view}' 不存在，已查找以下位置：".join('<br> ', $paths));
     }
 
     public function init($layout = "", $data = [], $left_delimiter = "{", $right_delimiter = "}", $__template_dir = ROOT_PATH . DS . "app" . DS . "view" . DS): void
