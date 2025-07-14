@@ -21,8 +21,6 @@ use nova\framework\exception\AppExitException;
 use nova\framework\http\Response;
 use nova\framework\http\ResponseType;
 
-use nova\framework\route\Route;
-
 class ViewResponse extends Response
 {
     /**
@@ -87,7 +85,9 @@ class ViewResponse extends Response
 
         // 添加基础路径（如果 route 为空，也至少有这个路径）
         $paths[] = $this->__template_dir . DS . $view . ".tpl";
-
+        if (str_starts_with($view, ROOT_PATH . DS)) {
+            $paths[] =  $view . ".tpl";
+        }
         // 查找视图文件
         foreach ($paths as $path) {
             if (file_exists($path)) {
