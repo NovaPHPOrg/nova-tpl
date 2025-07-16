@@ -1,9 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace nova\plugin\tpl;
 
 use app\Application;
 use nova\framework\core\StaticRegister;
+
 use nova\framework\event\EventManager;
 use nova\framework\exception\AppExitException;
 
@@ -12,6 +15,10 @@ class TplHandler extends StaticRegister
     public static function registerInfo(): void
     {
         EventManager::addListener("route.before", function ($event, &$uri) {
+
+            if (class_exists('\nova\plugin\cookie\Session')) {
+                \nova\plugin\cookie\Session::getInstance()->start();
+            }
             $map = [
                 "400" => [
                     "error_title" => "400 Bad Request",
@@ -61,14 +68,14 @@ class TplHandler extends StaticRegister
                 "error" => [
                     "error_title" => $_SESSION["error_title"] ?? "",
                     "error_message" => $_SESSION["error_message"] ?? "",
-                    "error_sub_message" =>$_SESSION["error_sub_message"] ?? "",
+                    "error_sub_message" => $_SESSION["error_sub_message"] ?? "",
                 ]
             ];
 
             foreach ($map as $key => $value) {
-                if(str_ends_with($uri, "/".$key)){
+                if (str_ends_with($uri, "/".$key)) {
 
-                    if(empty($value["error_title"])){
+                    if (empty($value["error_title"])) {
                         $value = $map["400"];
                     }
 
@@ -78,16 +85,18 @@ class TplHandler extends StaticRegister
                         [
                             'title' => Application::SYSTEM_NAME,
                         ],
-                        "{","}",ROOT_PATH.DS."nova".DS."plugin".DS."tpl".DS."error".DS,
+                        "{",
+                        "}",
+                        ROOT_PATH.DS."nova".DS."plugin".DS."tpl".DS."error".DS,
                     );
 
-                    if(isset($_SERVER['HTTP_X_PJAX']) && $_SERVER['HTTP_X_PJAX'] == 'true'){
-                        throw new AppExitException($viewResponse->asTpl("error",[
+                    if (isset($_SERVER['HTTP_X_PJAX']) && $_SERVER['HTTP_X_PJAX'] == 'true') {
+                        throw new AppExitException($viewResponse->asTpl("error", [
                             "error_title" => $value["error_title"],
                             "error_message" => $value["error_message"],
                             "error_sub_message" => $value["error_sub_message"],
                         ]));
-                    }else{
+                    } else {
                         throw new AppExitException($viewResponse->asTpl("layout"));
                     }
                 }
