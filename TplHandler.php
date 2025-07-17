@@ -15,9 +15,14 @@ class TplHandler extends StaticRegister
     public static function registerInfo(): void
     {
         EventManager::addListener("route.before", function ($event, &$uri) {
-
+            $error_title =  "";
+            $error_message = "";
+            $error_sub_message =   "";
             if (class_exists('\nova\plugin\cookie\Session')) {
                 \nova\plugin\cookie\Session::getInstance()->start();
+                $error_title =  \nova\plugin\cookie\Session::getInstance()->get("error_title");
+                $error_message = \nova\plugin\cookie\Session::getInstance()->get("error_message");
+                $error_sub_message =   \nova\plugin\cookie\Session::getInstance()->get("error_sub_message");
             }
             $map = [
                 "400" => [
@@ -66,9 +71,9 @@ class TplHandler extends StaticRegister
                     "error_sub_message" => "抱歉，服务器请求超时，请稍后再试。",
                 ],
                 "error" => [
-                    "error_title" => $_SESSION["error_title"] ?? "",
-                    "error_message" => $_SESSION["error_message"] ?? "",
-                    "error_sub_message" => $_SESSION["error_sub_message"] ?? "",
+                    "error_title" => $error_title,
+                    "error_message" => $error_message,
+                    "error_sub_message" => $error_sub_message,
                 ]
             ];
 
