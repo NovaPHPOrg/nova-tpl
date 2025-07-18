@@ -19,7 +19,6 @@ class TplHandler extends StaticRegister
             $error_message = "";
             $error_sub_message =   "";
             if (class_exists('\nova\plugin\cookie\Session')) {
-                \nova\plugin\cookie\Session::getInstance()->start();
                 $error_title =  \nova\plugin\cookie\Session::getInstance()->get("error_title");
                 $error_message = \nova\plugin\cookie\Session::getInstance()->get("error_message");
                 $error_sub_message =   \nova\plugin\cookie\Session::getInstance()->get("error_sub_message");
