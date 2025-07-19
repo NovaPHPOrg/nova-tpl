@@ -21,31 +21,68 @@ use nova\framework\exception\AppExitException;
 use nova\framework\http\Response;
 use nova\framework\http\ResponseType;
 
+/**
+ * 视图响应类
+ *
+ * 继承自 Response 类，用于处理模板视图的渲染和响应。
+ * 支持模板编译、布局文件、数据传递等功能。
+ *
+ * @package nova\plugin\tpl
+ * @author Your Name
+ * @since 1.0.0
+ */
 class ViewResponse extends Response
 {
     /**
-     * @var string $__layout 模板布局
+     * 模板布局文件路径
+     *
+     * @var string
      */
     private string $__layout = "";
+
     /**
-     * @var array $__data 模板数据
+     * 传递给模板的数据数组
+     *
+     * @var array
      */
     private array $__data = [];
+
     /**
-     * @var string $__left_delimiter 模板左定界符
+     * 模板左定界符
+     *
+     * @var string
      */
     private string $__left_delimiter = "{";
+
     /**
-     * @var string $__right_delimiter 模板右定界符
+     * 模板右定界符
+     *
+     * @var string
      */
     private string $__right_delimiter = "}";
+
     /**
-     * @var string $__template_dir 模板目录
+     * 模板文件目录路径
+     *
+     * @var string
      */
     private string $__template_dir = "";
 
+    /**
+     * 静态资源目录路径
+     *
+     * @var string
+     */
     private string $_static_dir = ROOT_PATH . DS . "runtime" . DS . "static";
 
+    /**
+     * 构造函数
+     *
+     * @param mixed        $data   响应数据
+     * @param int          $code   HTTP状态码
+     * @param ResponseType $type   响应类型
+     * @param array        $header HTTP响应头
+     */
     public function __construct(mixed $data = '', int $code = 200, ResponseType $type = ResponseType::HTML, array $header = [])
     {
         parent::__construct($data, $code, $type, $header);
@@ -57,6 +94,13 @@ class ViewResponse extends Response
 
     /**
      * 按优先级从不同位置查找视图文件
+     *
+     * 查找顺序：
+     * 1. 模块/控制器/视图.tpl
+     * 2. 模块/视图.tpl
+     * 3. 视图.tpl
+     * 4. 绝对路径视图.tpl
+     *
      * @param  string        $view 视图名称
      * @return string        返回找到的第一个视图文件路径
      * @throws ViewException 当视图文件都不存在时抛出异常
@@ -99,6 +143,16 @@ class ViewResponse extends Response
         throw new ViewException("视图文件 '{$view}' 不存在，已查找以下位置：".join('<br> ', $paths));
     }
 
+    /**
+     * 初始化视图响应配置
+     *
+     * @param  string $layout          布局文件路径
+     * @param  array  $data            传递给模板的数据
+     * @param  string $left_delimiter  模板左定界符
+     * @param  string $right_delimiter 模板右定界符
+     * @param  string $__template_dir  模板目录路径
+     * @return void
+     */
     public function init($layout = "", $data = [], $left_delimiter = "{", $right_delimiter = "}", $__template_dir = ROOT_PATH . DS . "app" . DS . "view" . DS): void
     {
         $this->__layout = $layout;
@@ -108,10 +162,21 @@ class ViewResponse extends Response
         $this->__template_dir = $__template_dir;
     }
 
+    /**
+     * 视图编译器实例
+     *
+     * @var ViewCompile|null
+     */
     private ?ViewCompile $viewCompile = null;
 
     /**
-     * @throws ViewException
+     * 渲染模板并返回HTML响应
+     *
+     * @param  string        $view    视图名称
+     * @param  array         $data    传递给模板的数据
+     * @param  array         $headers HTTP响应头
+     * @return Response      HTML响应对象
+     * @throws ViewException 当模板编译失败时抛出异常
      */
     public function asTpl(string $view = "", array $data = [], array $headers = []): Response
     {
@@ -128,7 +193,13 @@ class ViewResponse extends Response
     }
 
     /**
-     * @throws ViewException
+     * 动态编译模板
+     *
+     * 将模板文件编译为PHP代码并执行，返回渲染后的HTML内容。
+     *
+     * @param  string        $view 视图文件路径
+     * @return string        渲染后的HTML内容
+     * @throws ViewException 当模板编译或执行失败时抛出异常
      */
     private function dynamicCompilation($view): string
     {
@@ -162,6 +233,12 @@ class ViewResponse extends Response
         return $result;
     }
 
+    /**
+     * 编译模板文件
+     *
+     * @param  string $tplFile 模板文件路径
+     * @return string 编译后的PHP文件路径
+     */
     private function compile($tplFile): string
     {
         return $this->viewCompile->compile($tplFile);

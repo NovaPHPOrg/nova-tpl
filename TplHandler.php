@@ -10,19 +10,49 @@ use nova\framework\core\StaticRegister;
 use nova\framework\event\EventManager;
 use nova\framework\exception\AppExitException;
 
+/**
+ * 模板处理器类
+ *
+ * 负责处理HTTP错误页面的模板渲染，包括：
+ * - 监听路由前置事件
+ * - 检测错误状态码
+ * - 渲染对应的错误页面模板
+ * - 支持PJAX请求的错误页面处理
+ *
+ * @author Ankio
+ * @version 1.0
+ * @since 2025-01-01
+ */
 class TplHandler extends StaticRegister
 {
+    /**
+     * 注册模板处理器信息
+     *
+     * 监听路由前置事件，当检测到错误状态码时：
+     * - 从Session中获取自定义错误信息
+     * - 根据状态码映射对应的错误页面
+     * - 渲染错误页面模板
+     * - 支持PJAX和完整页面两种渲染模式
+     *
+     * @return void
+     */
     public static function registerInfo(): void
     {
+        // 监听路由前置事件，在路由处理前检查错误状态码
         EventManager::addListener("route.before", function ($event, &$uri) {
+            // 初始化错误信息变量
             $error_title =  "";
             $error_message = "";
             $error_sub_message =   "";
+
+            // 如果Session类存在，尝试从Session中获取自定义错误信息
             if (class_exists('\nova\plugin\cookie\Session')) {
                 $error_title =  \nova\plugin\cookie\Session::getInstance()->get("error_title");
                 $error_message = \nova\plugin\cookie\Session::getInstance()->get("error_message");
                 $error_sub_message =   \nova\plugin\cookie\Session::getInstance()->get("error_sub_message");
             }
+
+            // 定义HTTP状态码与错误信息的映射关系
             $map = [
                 "400" => [
                     "error_title" => "400 Bad Request",
@@ -76,31 +106,37 @@ class TplHandler extends StaticRegister
                 ]
             ];
 
+            // 遍历错误映射，检查URI是否以错误状态码结尾
             foreach ($map as $key => $value) {
                 if (str_ends_with($uri, "/".$key)) {
 
+                    // 如果错误标题为空，使用400错误作为默认值
                     if (empty($value["error_title"])) {
                         $value = $map["400"];
                     }
 
+                    // 创建视图响应对象
                     $viewResponse = new ViewResponse();
                     $viewResponse->init(
-                        '',
+                        '', // 布局模板为空
                         [
-                            'title' => Application::SYSTEM_NAME,
+                            'title' => Application::SYSTEM_NAME, // 设置页面标题为系统名称
                         ],
-                        "{",
-                        "}",
-                        ROOT_PATH.DS."nova".DS."plugin".DS."tpl".DS."error".DS,
+                        "{", // 模板左定界符
+                        "}", // 模板右定界符
+                        ROOT_PATH.DS."nova".DS."plugin".DS."tpl".DS."error".DS, // 错误模板目录
                     );
 
+                    // 检查是否为PJAX请求
                     if (isset($_SERVER['HTTP_X_PJAX']) && $_SERVER['HTTP_X_PJAX'] == 'true') {
+                        // PJAX请求：只渲染错误页面内容，不包含布局
                         throw new AppExitException($viewResponse->asTpl("error", [
                             "error_title" => $value["error_title"],
                             "error_message" => $value["error_message"],
                             "error_sub_message" => $value["error_sub_message"],
                         ]));
                     } else {
+                        // 完整页面请求：渲染包含布局的完整页面
                         throw new AppExitException($viewResponse->asTpl("layout"));
                     }
                 }
