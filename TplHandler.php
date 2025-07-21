@@ -45,13 +45,6 @@ class TplHandler extends StaticRegister
             $error_message = "";
             $error_sub_message =   "";
 
-            // 如果Session类存在，尝试从Session中获取自定义错误信息
-            if (class_exists('\nova\plugin\cookie\Session')) {
-                $error_title =  \nova\plugin\cookie\Session::getInstance()->get("error_title");
-                $error_message = \nova\plugin\cookie\Session::getInstance()->get("error_message");
-                $error_sub_message =   \nova\plugin\cookie\Session::getInstance()->get("error_sub_message");
-            }
-
             // 定义HTTP状态码与错误信息的映射关系
             $map = [
                 "400" => [
@@ -111,8 +104,15 @@ class TplHandler extends StaticRegister
                 if (str_ends_with($uri, "/".$key)) {
 
                     // 如果错误标题为空，使用400错误作为默认值
-                    if (empty($value["error_title"])) {
-                        $value = $map["400"];
+                    if ($key === "error") {
+                        // 如果Session类存在，尝试从Session中获取自定义错误信息
+                        if (class_exists('\nova\plugin\cookie\Session')) {
+                            $value["error_title"] =  \nova\plugin\cookie\Session::getInstance()->get("error_title");
+                            $value["error_message"] = \nova\plugin\cookie\Session::getInstance()->get("error_message");
+                            $value["error_sub_message"] =   \nova\plugin\cookie\Session::getInstance()->get("error_sub_message");
+                        } else {
+                            $value = $map["400"];
+                        }
                     }
 
                     // 创建视图响应对象
