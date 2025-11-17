@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace nova\plugin\tpl\handler;
 
+use nova\framework\core\Context;
 use nova\framework\exception\AppExitException;
 use nova\framework\http\Response;
 use nova\framework\http\ResponseType;
@@ -11,6 +12,7 @@ use nova\plugin\tpl\minify\NovaMinify;
 
 use function nova\framework\config;
 
+use function nova\framework\dump;
 use const ROOT_PATH;
 
 /**
@@ -106,7 +108,6 @@ EOF;
         $files = $_GET['file'] ?? null;
         $type = strtolower($_GET['type'] ?? 'js');
         $version = $_GET['v'] ?? '';
-        
         // 验证 type 参数
         if (!in_array($type, ['js', 'css'], true)) {
             throw new AppExitException(
@@ -270,39 +271,48 @@ EOF;
             "/* Generated: " . date('Y-m-d H:i:s') . " */",
             "/* Files: " . implode(', ', array_map('basename', $fileList)) . " */\n"
         ];
-        
-        // 合并所有文件内容
-        foreach ($fileList as $file) {
-            $filePath = ROOT_PATH . '/app/static/' . $file;
-            $filename = basename($file);
-
-            $parts[] = "\n/* ========== {$filename} ========== */";
-            $parts[] = file_get_contents($filePath);
-            $parts[] = "/* ========== End of {$filename} ========== */\n";
-        }
-        
         // 仅对 JS 文件添加运行时标记
         if ($type === 'js') {
             // 标记所有文件已加载
-            $parts[] = "\n/* 标记所有文件已加载 */";
-            $parts[] = ";if(!window.novaFiles){window.novaFiles = {};}";
-            
-            foreach ($fileList as $file) {
-                $parts[] = "window.novaFiles['/static/{$file}'] = true;";
-            }
+            $parts[] = ";if(!window.loadedResources){window.loadedResources = {};}";
+
+
 
             $configVersion = config("version");
             $debug = config("debug") ? "true" : "false";
             $parts[] = "\nwindow.debug = $debug;";
             $parts[] = "window.version = '$configVersion';";
         }
+        $uri = Context::instance()->request()->getBasicAddress();
+        // 合并所有文件内容
+        foreach ($fileList as $file) {
+            $filePath = ROOT_PATH . '/app/static/' . $file;
+            $filename = basename($file);
+
+            $parts[] = "\n/* ========== {$filename} ========== */";
+            $output = file_get_contents($filePath);
+            if (!str_contains($filename,".min")){
+                if ($type === 'js'){
+                    $parts[] = NovaMinify::minifyJs($output);
+                }else{
+                    $parts[] = NovaMinify::minifyCss($output);
+                }
+            }else{
+                $parts[] = $output;
+            }
+
+            $parts[] = "/* ========== End of {$filename} ========== */\n";
+            $parts[] = "window.loadedResources['{$uri}/static/{$file}'] = true;";
+        }
+
+
+
+
         
         $output = implode("\n", $parts);
         
         // 自动压缩合并后的内容
-        return $type === 'js' 
-            ? NovaMinify::minifyJs($output)
-            : NovaMinify::minifyCss($output);
+        return $output;
     }
 }
 
