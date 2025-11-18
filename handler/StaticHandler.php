@@ -290,7 +290,7 @@ EOF;
             $filename = basename($file);
 
             $parts[] = "\n/* ========== {$filename} ========== */";
-            $output = file_get_contents($filePath);
+            $output = self::remove_bom(file_get_contents($filePath));
             if (!str_contains($filename,".min")){
                 if ($type === 'js'){
                     $parts[] = NovaMinify::minifyJs($output);
@@ -314,5 +314,12 @@ EOF;
         // 自动压缩合并后的内容
         return $output;
     }
+    static function remove_bom($str) {
+        if (str_starts_with($str, "\xEF\xBB\xBF")) {
+            return substr($str, 3);
+        }
+        return $str;
+    }
+
 }
 
