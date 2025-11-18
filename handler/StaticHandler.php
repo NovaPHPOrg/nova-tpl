@@ -271,12 +271,14 @@ EOF;
             "/* Generated: " . date('Y-m-d H:i:s') . " */",
             "/* Files: " . implode(', ', array_map('basename', $fileList)) . " */\n"
         ];
+        
+        // CSS 专用：收集所有 @import 语句
+        $cssImports = [];
+        
         // 仅对 JS 文件添加运行时标记
         if ($type === 'js') {
             // 标记所有文件已加载
             $parts[] = ";if(!window.loadedResources){window.loadedResources = {};}";
-
-
 
             $configVersion = config("version");
             $debug = config("debug") ? "true" : "false";
@@ -284,6 +286,7 @@ EOF;
             $parts[] = "window.version = '$configVersion';";
         }
         $uri = Context::instance()->request()->getBasicAddress();
+        
         // 合并所有文件内容
         foreach ($fileList as $file) {
             $filePath = ROOT_PATH . '/app/static/' . $file;
@@ -291,28 +294,70 @@ EOF;
 
             $parts[] = "\n/* ========== {$filename} ========== */";
             $output = self::remove_bom(file_get_contents($filePath));
-            if (!str_contains($filename,".min")){
-                if ($type === 'js'){
+            
+            // CSS：提取 @import 语句
+            if ($type === 'css') {
+                $output = self::extractCssImports($output, $cssImports);
+            }
+            
+            if (!str_contains($filename, ".min")) {
+                if ($type === 'js') {
                     $parts[] = NovaMinify::minifyJs($output);
-                }else{
+                } else {
                     $parts[] = NovaMinify::minifyCss($output);
                 }
-            }else{
+            } else {
                 $parts[] = $output;
             }
 
             $parts[] = "/* ========== End of {$filename} ========== */\n";
             $parts[] = "window.loadedResources['{$uri}/static/{$file}'] = true;";
         }
-
-
-
-
+        
+        // CSS：将所有 @import 插入到开头
+        if ($type === 'css' && !empty($cssImports)) {
+            // 在头部注释后插入所有 @import
+            array_splice($parts, 5, 0, [
+                "\n/* ========== Extracted @import Statements ========== */",
+                implode("\n", $cssImports),
+                "/* ========== End of @import Statements ========== */\n"
+            ]);
+        }
         
         $output = implode("\n", $parts);
         
         // 自动压缩合并后的内容
         return $output;
+    }
+    
+    /**
+     * 提取 CSS 中的 @import 语句
+     * 
+     * @param string $css CSS 内容
+     * @param array &$imports 收集的 @import 语句（引用传递）
+     * @return string 移除 @import 后的 CSS
+     */
+    private static function extractCssImports(string $css, array &$imports): string
+    {
+        // 匹配所有可能的 @import 格式：
+        // @import "url";
+        // @import"url";  (无空格)
+        // @import 'url';
+        // @import url("url");
+        // @import url('url');
+        $pattern = '/@import\s*(?:url\s*\(\s*)?["\']([^"\']+)["\']\s*\)?[^;]*;/i';
+        
+        preg_match_all($pattern, $css, $matches);
+        
+        // 收集所有 @import（去重）
+        foreach ($matches[0] as $importStatement) {
+            if (!in_array($importStatement, $imports, true)) {
+                $imports[] = $importStatement;
+            }
+        }
+        
+        // 从原 CSS 中移除所有 @import
+        return preg_replace($pattern, '', $css);
     }
     static function remove_bom($str) {
         if (str_starts_with($str, "\xEF\xBB\xBF")) {
