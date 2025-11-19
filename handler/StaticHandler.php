@@ -311,7 +311,7 @@ EOF;
             }
 
             $parts[] = "/* ========== End of {$filename} ========== */\n";
-            $parts[] = "window.loadedResources['{$uri}/static/{$file}'] = true;";
+            if ($type == "js") $parts[] = "window.loadedResources['{$uri}/static/{$file}'] = true;";
         }
         
         // CSS：将所有 @import 插入到开头
