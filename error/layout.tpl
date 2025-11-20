@@ -14,7 +14,8 @@
     <link rel="stylesheet" href="/static/bundle?file=
     framework/libs/mdui.css,
     framework/base.css,
-    framework/utils/Loading.css
+    framework/utils/Loading.css,
+        framework/pjax/nprogress.min.css,
     &type=css&v={$__v}">
 
     <style id="style">
@@ -45,7 +46,10 @@
     framework/utils/Request.js,
     framework/theme/ThemeSwitcher.js,
     framework/language/TranslateUtils.js,
-    framework/language/Language.js
+    framework/language/Language.js,
+framework/pjax/pjax.min.js,
+framework/pjax/nprogress.js,
+framework/pjax/PjaxUtils.js,
     &type=js&v={$__v}"></script>
 <script>
     let level = debug ? 'debug' : 'error';
@@ -68,14 +72,12 @@
 
 
 <script>
-    $.loader(['Pjax'], () => {
-        let pjax = new PjaxUtils(true, function () {
+    let pjax = new PjaxUtils(true, function () {
 
-        }, "/404");
-        pjax.loadUri(window.location.pathname);
-        $("[data-pjax-item]").on("click",function () {
-            pjax.loadUri($(this).data("href"));
-        });
+    }, "/404");
+    pjax.loadUri(window.location.pathname);
+    $("[data-pjax-item]").on("click",function () {
+        pjax.loadUri($(this).data("href"));
     });
 
 </script>
