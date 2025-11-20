@@ -6,17 +6,16 @@
     <meta name="renderer" content="webkit"/>
     <title id="title">{$title}</title>
     {*MDUI JS库*}
-    <link rel="stylesheet" href="/static/framework/libs/mdui.css?v={$__v}">
-    <link rel="stylesheet" href="/static/framework/base.css?v={$__v}">
-    <script src="/static/framework/libs/mdui.global.min.js?v={$__v}"></script>
-    <link rel="stylesheet" href="/static/framework/icons/fonts.css?v={$__v}">
-    <link rel="stylesheet" href="/static/framework/utils/Loading.css?v={$__v}">
-    <script src="/static/framework/libs/vhcheck.min.js?v={$__v}"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- 使用 font-display=swap 避免字体加载时的布局偏移 -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Icons&family=Material+Icons+Outlined&display=swap" rel="stylesheet">
 
-    <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png?v={$__v}"/>
-    <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32x32.png?v={$__v}"/>
-    <link rel="icon" type="image/png" sizes="16x16" href="/static/icons/favicon-16x16.png?v={$__v}"/>
-    <link rel="icon" type="image/ico" href="/static/icons/favicon.ico?v={$__v}"/>
+    <link rel="stylesheet" href="/static/bundle?file=
+    framework/libs/mdui.css,
+    framework/base.css,
+    framework/utils/Loading.css
+    &type=css&v={$__v}">
 
     <style id="style">
     </style>
@@ -32,30 +31,26 @@
 </head>
 
 <body>
-<script src="/static/framework/bootloader.js?v={$__v}"></script>
-<script src="/static/framework/utils/Loading.js?v={$__v}"></script>
-<script src="/static/framework/utils/Logger.js?v={$__v}"></script>
-<script src="/static/framework/utils/Loader.js?v={$__v}"></script>
-<script src="/static/framework/utils/Event.js?v={$__v}"></script>
-<script src="/static/framework/utils/Toaster.js?v={$__v}"></script>
-<script src="/static/framework/utils/Request.js?v={$__v}"></script>
-<script src="/static/components/theme/ThemeSwitcher.js?v={$__v}"></script>
-<script src="/static/components/language/Language.js?v={$__v}"></script>
+
+<script src="/static/bundle?file=
+    framework/libs/vhcheck.min.js,
+    framework/libs/mdui.global.min.js,
+    framework/bootloader.js,
+    framework/utils/Loading.js,
+    framework/utils/Logger.js,
+    framework/utils/Loader.js,
+    framework/utils/Event.js,
+    framework/utils/Toaster.js,
+    framework/utils/Form.js,
+    framework/utils/Request.js,
+    framework/theme/ThemeSwitcher.js,
+    framework/language/TranslateUtils.js,
+    framework/language/Language.js
+    &type=js&v={$__v}"></script>
 <script>
-    window._v = "{$__v}"
     let level = debug ? 'debug' : 'error';
     $.logger.setLevel(level);
     $.logger.info('App is running in ' + level + ' mode');
-    $.preloader([
-        'Loading',
-        'Logger',
-        'Event',
-        'Toaster',
-        'Request',
-        'ThemeSwitcher',
-        'Language'
-    ]);
-    window.loading && window.loading.close();
     $.request.setBaseUrl(baseUri).setOnCode(401,()=>{
         $.toaster.error('登录已过期，请重新登录');
         setTimeout(()=>{
