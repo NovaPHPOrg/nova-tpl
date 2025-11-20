@@ -131,7 +131,7 @@ class TplHandler
         return [
             "error_title" => $session->get("error_title") ?: self::ERROR_MAP["400"]["error_title"],
             "error_message" => $session->get("error_message") ?: self::ERROR_MAP["400"]["error_message"],
-            "error_sub_message" => $session->get("error_sub_message") ?: self::ERROR_MAP["400"]["error_sub_message"],
+            "error_sub_message" => $session->get("error_sub_message") ?: '',
         ];
     }
     
