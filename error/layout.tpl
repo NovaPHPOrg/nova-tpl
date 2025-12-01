@@ -6,10 +6,10 @@
     <meta name="renderer" content="webkit"/>
     <title id="title">{$title}</title>
     {*MDUI JS库*}
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.loli.net">
+    <link rel="preconnect" href="https://gstatic.loli.net" crossorigin>
     <!-- 使用 font-display=swap 避免字体加载时的布局偏移 -->
-    <link href="https://fonts.googleapis.com/css2?family=Material+Icons&family=Material+Icons+Outlined&display=swap" rel="stylesheet">
+    <link href="https://fonts.loli.net/css2?family=Material+Icons&family=Material+Icons+Outlined&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="/static/bundle?file=
     framework/libs/mdui.css,
