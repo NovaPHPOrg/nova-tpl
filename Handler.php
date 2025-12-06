@@ -39,12 +39,6 @@ class Handler extends StaticRegister
         EventManager::addListener("response.static.before", function ($event, &$file) {
             return NovaMinify::handleStaticFile($file);
         });
-        
-        // 注册静态文件响应后处理（novaFiles 标记）
-        EventManager::addListener("response.static.after", function ($event, $file) {
-            StaticHandler::handleJsFileMarker($file);
-        });
-        
         // 注册 HTML 响应前处理（HTML 压缩）
         EventManager::addListener("response.html.before", function ($event, &$data) {
             $data = NovaMinify::minifyHtml($data);

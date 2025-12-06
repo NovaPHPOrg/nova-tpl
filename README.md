@@ -53,7 +53,6 @@ nova/plugin/tpl/
 
 **功能：**
 - 静态文件路由分发
-- JS 文件自动添加 `novaFiles` 标记
 - bootloader.js 注入 debug 和 version 信息
 
 **使用：**

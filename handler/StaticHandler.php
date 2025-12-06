@@ -19,7 +19,6 @@ use const ROOT_PATH;
  * 静态资源处理器类
  *
  * 负责处理静态文件路由和框架核心脚本合并：
- * - JS 文件添加 novaFiles 标记
  * - bootloader.js 添加调试和版本信息
  * - /static/ 路径下的文件路由
  * - /static/bundle 脚本合并请求
@@ -30,33 +29,6 @@ use const ROOT_PATH;
  */
 class StaticHandler
 {
-    /**
-     * 处理 JS 文件响应后的标记添加
-     * 
-     * @param string $file 文件路径
-     * @return void
-     */
-    public static function handleJsFileMarker(string $file): void
-    {
-        $name = basename($file);
-        
-        if (!str_ends_with($name, ".js")) {
-            return;
-        }
-        
-        // 添加 novaFiles 标记
-        echo <<<EOF
-;if(!window.novaFiles){window.novaFiles = {};}
-window.novaFiles['$name'] = true;
-EOF;
-        $version = config("version");
-        $debug = config("debug") ? "true" : "false";
-        echo <<<EOF
-window.debug = $debug;
-window.version = '$version';
-EOF;
-
-    }
     
     /**
      * 处理静态文件路由
@@ -280,10 +252,10 @@ EOF;
             // 标记所有文件已加载
             $parts[] = ";if(!window.loadedResources){window.loadedResources = {};}";
 
-            $configVersion = config("version");
-            $debug = config("debug") ? "true" : "false";
+            $version = Context::instance()->isDebug()?(string)time():config("version");
+            $debug = (string)Context::instance()->isDebug();
             $parts[] = "\nwindow.debug = $debug;";
-            $parts[] = "window.version = '$configVersion';";
+            $parts[] = "window.version = '$version';";
         }
         $uri = Context::instance()->request()->getBasicAddress();
         
