@@ -253,7 +253,7 @@ class StaticHandler
             $parts[] = ";if(!window.loadedResources){window.loadedResources = {};}";
 
             $version = Context::instance()->isDebug()?(string)time():config("version");
-            $debug = (string)Context::instance()->isDebug();
+            $debug = Context::instance()->isDebug()?"true":"false";
             $parts[] = "\nwindow.debug = $debug;";
             $parts[] = "window.version = '$version';";
         }
