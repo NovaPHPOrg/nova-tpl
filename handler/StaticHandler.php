@@ -46,7 +46,7 @@ class StaticHandler
         
         // 处理普通静态文件
         if (str_starts_with($uri, "/static/")) {
-            $file = substr($uri, 8);
+            $file = urldecode(substr($uri, 8));
             $file = str_replace("..", "", $file);
             throw new AppExitException(
                 Response::asStatic(ROOT_PATH . '/app/static/' . $file),
