@@ -13,7 +13,6 @@ declare(strict_types=1);
 namespace nova\plugin\tpl;
 
 use nova\framework\core\Logger;
-use function nova\framework\dump;
 
 class ViewCompile
 {
@@ -110,7 +109,6 @@ class ViewCompile
                 }
             }
 
-
             if (!$found) {
                 throw new \RuntimeException("Template not found within 3 parent levels: {$base}");
             }
@@ -130,13 +128,13 @@ class ViewCompile
     private function compileFile(string $tplFile, string $compileFile): void
     {
         $content = file_get_contents($tplFile);
-        $content = $this->compileContent($content,dirname($tplFile));
+        $content = $this->compileContent($content, dirname($tplFile));
         file_put_contents($compileFile, $content);
     }
 
-    private function compileContent(string $content,string $dir): string
+    private function compileContent(string $content, string $dir): string
     {
-        $content = $this->_compile_struct($content,$dir);
+        $content = $this->_compile_struct($content, $dir);
         $content = $this->_compile_function($content);
         $content = '<?php declare(strict_types=1); namespace nova\plugin\tpl; if(!class_exists("' . str_replace("\\", "\\\\", ViewResponse::class) . '", false)) exit("[ Nova ] Render Error. ");?>' . $content;
         return $content;
@@ -147,7 +145,7 @@ class ViewCompile
      * @param  string $template_data
      * @return string
      */
-    private function _compile_struct(string $template_data,string $dir): string
+    private function _compile_struct(string $template_data, string $dir): string
     {
         $foreach_inner_before = '<?php if(!empty($1)){ $_foreach_$3_counter = 0; $_foreach_$3_total = count($1);?>';
         $foreach_inner_after = '<?php $_foreach_$3_index = $_foreach_$3_counter;$_foreach_$3_iteration = $_foreach_$3_counter + 1;$_foreach_$3_first = ($_foreach_$3_counter == 0);$_foreach_$3_last = ($_foreach_$3_counter == $_foreach_$3_total - 1);$_foreach_$3_counter++;?>';

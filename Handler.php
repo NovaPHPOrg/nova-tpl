@@ -20,7 +20,7 @@ use nova\plugin\tpl\minify\NovaMinify;
 
 /**
  * TPL 插件统一注册器
- * 
+ *
  * 负责注册所有 TPL 相关的处理器：
  * - TplHandler: 错误页面处理
  * - StaticHandler: 静态资源和Bundle处理
@@ -30,7 +30,7 @@ class Handler extends StaticRegister
 {
     /**
      * 注册所有处理器
-     * 
+     *
      * @return void
      */
     public static function registerInfo(): void
@@ -43,12 +43,12 @@ class Handler extends StaticRegister
         EventManager::addListener("response.html.before", function ($event, &$data) {
             $data = NovaMinify::minifyHtml($data);
         });
-        
+
         // 注册路由前处理
         EventManager::addListener("route.before", function ($event, &$uri) {
             // 处理错误页面
             TplHandler::handleErrorPage($uri);
-            
+
             // 处理静态文件路由
             StaticHandler::handleStaticRoute($uri);
         });

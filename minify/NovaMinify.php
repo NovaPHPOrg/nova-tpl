@@ -14,9 +14,9 @@ namespace nova\plugin\tpl\minify;
 
 use Exception;
 
-use nova\framework\core\Context;
 use function nova\framework\config;
-use const ROOT_PATH;
+
+use nova\framework\core\Context;
 
 /**
  * 资源压缩处理器
@@ -39,8 +39,8 @@ class NovaMinify
      *
      * 优化：使用 pathinfo 提取扩展名，性能更好
      *
-     * @param string $file 文件路径
-     * @return bool true 表示已处理并输出，false 表示继续默认流程
+     * @param  string $file 文件路径
+     * @return bool   true 表示已处理并输出，false 表示继续默认流程
      */
     public static function handleStaticFile(string $file): bool
     {
@@ -90,7 +90,7 @@ class NovaMinify
     /**
      * 压缩 HTML 内容
      *
-     * @param string $rawInput 原始 HTML
+     * @param  string $rawInput 原始 HTML
      * @return string 压缩后的 HTML
      */
     public static function minifyHtml(string $rawInput): string
@@ -117,10 +117,10 @@ class NovaMinify
             '#<([^\/\s<>!]+)(?:\s+([^<>]*?)\s*|\s*)(\/?)>#s',
             function ($matches) {
                 return '<' . $matches[1] . preg_replace(
-                        '#([^\s=]+)(\=([\'"]?)(.*?)\3)?(\s+|$)#s',
-                        ' $1$2',
-                        $matches[2]
-                    ) . $matches[3] . '>';
+                    '#([^\s=]+)(\=([\'"]?)(.*?)\3)?(\s+|$)#s',
+                    ' $1$2',
+                    $matches[2]
+                ) . $matches[3] . '>';
             },
             str_replace("\r", "", $input)
         );
@@ -228,7 +228,7 @@ class NovaMinify
      * - 优化属性值（0.6 → .6，0px → 0）
      * - 移除空选择器
      *
-     * @param string $input 原始 CSS
+     * @param  string $input 原始 CSS
      * @return string 压缩后的 CSS
      */
     public static function minifyCss(string $input): string
@@ -291,7 +291,7 @@ class NovaMinify
      *
      * 使用 JsMinify 进行专业压缩
      *
-     * @param string $input 原始 JS
+     * @param  string $input 原始 JS
      * @return string 压缩后的 JS
      */
     public static function minifyJs(string $input): string
