@@ -59,7 +59,7 @@ framework/pjax/PjaxUtils.js,
     $.request.setBaseUrl(baseUri).setOnCode(401,()=>{
         $.toaster.error('登录已过期，请重新登录');
         setTimeout(()=>{
-            window.location.href = '/login';
+            window.location.href = response.data || '/login';
         },1000);
     }).setOnCode(301,(response)=>{
         window.location.href = response.data;
