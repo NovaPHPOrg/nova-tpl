@@ -287,24 +287,272 @@ class NovaMinify
     }
 
     /**
+     * 自动补全 JS 代码缺失的分号
+     * 原理：启发式按行判断，跳过字符串/注释/正则，尽量避免改写语义
+     *
+     * @param string $code JS 代码
+     * @return string 补全分号后的代码
+     */
+    private static function ensureSemicolons(string $code): string
+    {
+        $len = strlen($code);
+        $result = '';
+        $state = 'code';
+        $quote = '';
+        $escape = false;
+        $regexClass = false;
+        $lastSig = '';
+
+        $isRegexStart = static function (string $prev): bool {
+            if ($prev === '') {
+                return true;
+            }
+
+            return in_array(
+                $prev,
+                ['(', '[', '{', ',', ';', ':', '=', '!', '&', '|', '?',
+                 '+', '-', '*', '/', '%', '^', '<', '>' ],
+                true
+            );
+        };
+
+        $findNextSig = static function (string $code, int $start) use ($len): string {
+            for ($j = $start; $j < $len; $j++) {
+                $ch = $code[$j];
+                if ($ch === ' ' || $ch === "\t" || $ch === "\r" || $ch === "\n") {
+                    continue;
+                }
+                if ($ch === '/' && $j + 1 < $len) {
+                    $next = $code[$j + 1];
+                    if ($next === '/') {
+                        $j += 2;
+                        while ($j < $len && $code[$j] !== "\n" && $code[$j] !== "\r") {
+                            $j++;
+                        }
+                        continue;
+                    }
+                    if ($next === '*') {
+                        $j += 2;
+                        while ($j + 1 < $len && !($code[$j] === '*' && $code[$j + 1] === '/')) {
+                            $j++;
+                        }
+                        $j++;
+                        continue;
+                    }
+                }
+                return $ch;
+            }
+
+            return '';
+        };
+
+        $shouldInsert = static function (string $prev, string $next): bool {
+            if ($prev === '' || $next === '') {
+                return false;
+            }
+
+            $noPrev = [',', ';', '{', '(', '[', ':', '?', '.', '+', '-', '*', '/', '%',
+                       '&', '|', '^', '!', '=', '<', '>' ];
+            if (in_array($prev, $noPrev, true)) {
+                return false;
+            }
+
+            $noNext = [')', ']', '.', ',', ';', ':', '?', '}' ];
+            if (in_array($next, $noNext, true)) {
+                return false;
+            }
+
+            return preg_match('/[A-Za-z0-9_$\(\[`"\'\+\-\/]/', $next) === 1;
+        };
+
+        for ($i = 0; $i < $len; $i++) {
+            $ch = $code[$i];
+
+            if ($state === 'code') {
+                if ($ch === '"' || $ch === "'") {
+                    $state = 'string';
+                    $quote = $ch;
+                    $result .= $ch;
+                    $lastSig = $ch;
+                    continue;
+                }
+                if ($ch === '`') {
+                    $state = 'template';
+                    $result .= $ch;
+                    $lastSig = $ch;
+                    continue;
+                }
+                if ($ch === '/' && $i + 1 < $len) {
+                    $next = $code[$i + 1];
+                    if ($next === '/') {
+                        $state = 'line_comment';
+                        $result .= $ch . $next;
+                        $i++;
+                        continue;
+                    }
+                    if ($next === '*') {
+                        $state = 'block_comment';
+                        $result .= $ch . $next;
+                        $i++;
+                        continue;
+                    }
+                    if ($isRegexStart($lastSig)) {
+                        $state = 'regex';
+                        $regexClass = false;
+                        $result .= $ch;
+                        $lastSig = $ch;
+                        continue;
+                    }
+                }
+
+                if ($ch === "\n" || $ch === "\r") {
+                    $nextSig = $findNextSig($code, $i + 1);
+                    if ($shouldInsert($lastSig, $nextSig)) {
+                        $result .= ';';
+                    }
+                    $result .= $ch;
+                    continue;
+                }
+
+                $result .= $ch;
+                if (!ctype_space($ch)) {
+                    $lastSig = $ch;
+                }
+                continue;
+            }
+
+            if ($state === 'string') {
+                $result .= $ch;
+                if ($escape) {
+                    $escape = false;
+                    continue;
+                }
+                if ($ch === '\\') {
+                    $escape = true;
+                    continue;
+                }
+                if ($ch === $quote) {
+                    $state = 'code';
+                    $lastSig = $ch;
+                }
+                continue;
+            }
+
+            if ($state === 'template') {
+                $result .= $ch;
+                if ($escape) {
+                    $escape = false;
+                    continue;
+                }
+                if ($ch === '\\') {
+                    $escape = true;
+                    continue;
+                }
+                if ($ch === '`') {
+                    $state = 'code';
+                    $lastSig = $ch;
+                }
+                continue;
+            }
+
+            if ($state === 'regex') {
+                $result .= $ch;
+                if ($escape) {
+                    $escape = false;
+                    continue;
+                }
+                if ($ch === '\\') {
+                    $escape = true;
+                    continue;
+                }
+                if ($ch === '[') {
+                    $regexClass = true;
+                    continue;
+                }
+                if ($ch === ']') {
+                    $regexClass = false;
+                    continue;
+                }
+                if ($ch === '/' && !$regexClass) {
+                    $state = 'code';
+                    $lastSig = '/';
+                }
+                continue;
+            }
+
+            if ($state === 'line_comment') {
+                if ($ch === "\n" || $ch === "\r") {
+                    $nextSig = $findNextSig($code, $i + 1);
+                    if ($shouldInsert($lastSig, $nextSig)) {
+                        $result .= ';';
+                    }
+                    $result .= $ch;
+                    $state = 'code';
+                    continue;
+                }
+                $result .= $ch;
+                continue;
+            }
+
+            if ($state === 'block_comment') {
+                $result .= $ch;
+                if ($ch === '*' && $i + 1 < $len && $code[$i + 1] === '/') {
+                    $result .= '/';
+                    $i++;
+                    $state = 'code';
+                    continue;
+                }
+                if ($ch === "\n" || $ch === "\r") {
+                    $nextSig = $findNextSig($code, $i + 1);
+                    if ($shouldInsert($lastSig, $nextSig)) {
+                        $result .= ';';
+                    }
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * 压缩 JavaScript 内容
      *
      * 使用 JsMinify 进行专业压缩
+     * 在压缩前自动补全缺失的分号，兼容无分号代码风格
      *
      * @param  string $input 原始 JS
      * @return string 压缩后的 JS
      */
+    private static function isModernJs(string $code): bool
+    {
+        // 检测 ES module 语法
+        if (preg_match('/\b(import|export)\s+/m', $code)) {
+            return true;
+        }
+
+
+        return false;
+    }
+
     public static function minifyJs(string $input): string
     {
         if (trim($input) === "") {
             return $input;
         }
 
-        try {
-            return JsMinify::minify($input);
-        } catch (Exception $e) {
-            // 压缩失败时返回原始内容
+        // 自动检测现代 JS 语法，跳过压缩（旧压缩器不支持）
+        if (self::isModernJs($input)) {
             return $input;
+        }
+
+
+        try {
+            // 先补全分号（处理无分号风格），再压缩
+            $normalized = self::ensureSemicolons($input);
+            return JsMinify::minify($normalized);
+        } catch (Exception $e) {
+            // 压缩失败时返回原始内容（也要补分号）
+            return self::ensureSemicolons($input);
         }
     }
 }
