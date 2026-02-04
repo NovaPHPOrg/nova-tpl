@@ -288,229 +288,75 @@ class NovaMinify
 
     /**
      * 自动补全 JS 代码缺失的分号
-     * 原理：启发式按行判断，跳过字符串/注释/正则，尽量避免改写语义
-     *
+     * 原理：检测关键字位置，判断是否在顶层（通过括号匹配），在顶层关键字前插入分号
+     * 
      * @param string $code JS 代码
      * @return string 补全分号后的代码
      */
     private static function ensureSemicolons(string $code): string
     {
-        $len = strlen($code);
+        // 语句开始的关键字
+        $keywords = ['var', 'let', 'const', 'function', 'class', 'if', 'for', 
+                     'while', 'do', 'switch', 'return', 'throw', 'break', 
+                     'continue', 'try', 'catch', 'finally', 'import', 'export',
+                     'async', 'await', 'case', 'default'];
+        
         $result = '';
-        $state = 'code';
-        $quote = '';
-        $escape = false;
-        $regexClass = false;
-        $lastSig = '';
-
-        $isRegexStart = static function (string $prev): bool {
-            if ($prev === '') {
-                return true;
-            }
-
-            return in_array(
-                $prev,
-                ['(', '[', '{', ',', ';', ':', '=', '!', '&', '|', '?',
-                 '+', '-', '*', '/', '%', '^', '<', '>' ],
-                true
-            );
-        };
-
-        $findNextSig = static function (string $code, int $start) use ($len): string {
-            for ($j = $start; $j < $len; $j++) {
-                $ch = $code[$j];
-                if ($ch === ' ' || $ch === "\t" || $ch === "\r" || $ch === "\n") {
-                    continue;
-                }
-                if ($ch === '/' && $j + 1 < $len) {
-                    $next = $code[$j + 1];
-                    if ($next === '/') {
-                        $j += 2;
-                        while ($j < $len && $code[$j] !== "\n" && $code[$j] !== "\r") {
-                            $j++;
-                        }
-                        continue;
-                    }
-                    if ($next === '*') {
-                        $j += 2;
-                        while ($j + 1 < $len && !($code[$j] === '*' && $code[$j + 1] === '/')) {
-                            $j++;
-                        }
-                        $j++;
-                        continue;
-                    }
-                }
-                return $ch;
-            }
-
-            return '';
-        };
-
-        $shouldInsert = static function (string $prev, string $next): bool {
-            if ($prev === '' || $next === '') {
-                return false;
-            }
-
-            $noPrev = [',', ';', '{', '(', '[', ':', '?', '.', '+', '-', '*', '/', '%',
-                       '&', '|', '^', '!', '=', '<', '>' ];
-            if (in_array($prev, $noPrev, true)) {
-                return false;
-            }
-
-            $noNext = [')', ']', '.', ',', ';', ':', '?', '}' ];
-            if (in_array($next, $noNext, true)) {
-                return false;
-            }
-
-            return preg_match('/[A-Za-z0-9_$\(\[`"\'\+\-\/]/', $next) === 1;
-        };
-
+        $len = strlen($code);
+        $depth = 0; // 括号嵌套深度
+        
         for ($i = 0; $i < $len; $i++) {
-            $ch = $code[$i];
-
-            if ($state === 'code') {
-                if ($ch === '"' || $ch === "'") {
-                    $state = 'string';
-                    $quote = $ch;
-                    $result .= $ch;
-                    $lastSig = $ch;
-                    continue;
-                }
-                if ($ch === '`') {
-                    $state = 'template';
-                    $result .= $ch;
-                    $lastSig = $ch;
-                    continue;
-                }
-                if ($ch === '/' && $i + 1 < $len) {
-                    $next = $code[$i + 1];
-                    if ($next === '/') {
-                        $state = 'line_comment';
-                        $result .= $ch . $next;
-                        $i++;
-                        continue;
-                    }
-                    if ($next === '*') {
-                        $state = 'block_comment';
-                        $result .= $ch . $next;
-                        $i++;
-                        continue;
-                    }
-                    if ($isRegexStart($lastSig)) {
-                        $state = 'regex';
-                        $regexClass = false;
-                        $result .= $ch;
-                        $lastSig = $ch;
-                        continue;
-                    }
-                }
-
-                if ($ch === "\n" || $ch === "\r") {
-                    $nextSig = $findNextSig($code, $i + 1);
-                    if ($shouldInsert($lastSig, $nextSig)) {
-                        $result .= ';';
-                    }
-                    $result .= $ch;
-                    continue;
-                }
-
-                $result .= $ch;
-                if (!ctype_space($ch)) {
-                    $lastSig = $ch;
-                }
-                continue;
+            $char = $code[$i];
+            
+            // 括号计数
+            if ($char === '{' || $char === '(' || $char === '[') {
+                $depth++;
+            } elseif ($char === '}' || $char === ')' || $char === ']') {
+                $depth--;
             }
-
-            if ($state === 'string') {
-                $result .= $ch;
-                if ($escape) {
-                    $escape = false;
-                    continue;
-                }
-                if ($ch === '\\') {
-                    $escape = true;
-                    continue;
-                }
-                if ($ch === $quote) {
-                    $state = 'code';
-                    $lastSig = $ch;
-                }
-                continue;
-            }
-
-            if ($state === 'template') {
-                $result .= $ch;
-                if ($escape) {
-                    $escape = false;
-                    continue;
-                }
-                if ($ch === '\\') {
-                    $escape = true;
-                    continue;
-                }
-                if ($ch === '`') {
-                    $state = 'code';
-                    $lastSig = $ch;
-                }
-                continue;
-            }
-
-            if ($state === 'regex') {
-                $result .= $ch;
-                if ($escape) {
-                    $escape = false;
-                    continue;
-                }
-                if ($ch === '\\') {
-                    $escape = true;
-                    continue;
-                }
-                if ($ch === '[') {
-                    $regexClass = true;
-                    continue;
-                }
-                if ($ch === ']') {
-                    $regexClass = false;
-                    continue;
-                }
-                if ($ch === '/' && !$regexClass) {
-                    $state = 'code';
-                    $lastSig = '/';
-                }
-                continue;
-            }
-
-            if ($state === 'line_comment') {
-                if ($ch === "\n" || $ch === "\r") {
-                    $nextSig = $findNextSig($code, $i + 1);
-                    if ($shouldInsert($lastSig, $nextSig)) {
-                        $result .= ';';
-                    }
-                    $result .= $ch;
-                    $state = 'code';
-                    continue;
-                }
-                $result .= $ch;
-                continue;
-            }
-
-            if ($state === 'block_comment') {
-                $result .= $ch;
-                if ($ch === '*' && $i + 1 < $len && $code[$i + 1] === '/') {
-                    $result .= '/';
-                    $i++;
-                    $state = 'code';
-                    continue;
-                }
-                if ($ch === "\n" || $ch === "\r") {
-                    $nextSig = $findNextSig($code, $i + 1);
-                    if ($shouldInsert($lastSig, $nextSig)) {
-                        $result .= ';';
+            
+            // 检测关键字（只在顶层）
+            if ($depth === 0) {
+                foreach ($keywords as $kw) {
+                    $kwLen = strlen($kw);
+                    // 检查当前位置是否是关键字
+                    if (substr($code, $i, $kwLen) === $kw) {
+                        // 确保是完整单词（后面是非字母）
+                        $nextChar = $i + $kwLen < $len ? $code[$i + $kwLen] : ' ';
+                        if (!ctype_alnum($nextChar) && $nextChar !== '_') {
+                            // 检查前面的非空字符
+                            for ($j = $i - 1; $j >= 0; $j--) {
+                                $prevChar = $code[$j];
+                                if (trim($prevChar) !== '') {
+                                    // 操作符（说明关键字在表达式中，不是语句开始）
+                                    $operators = ['=', '+', '-', '*', '/', '%', '&', '|', 
+                                                  '^', '!', '?', ':', '<', '>', ',', '(', '['];
+                                    
+                                    // 如果前面是操作符，不加分号
+                                    if (in_array($prevChar, $operators, true)) {
+                                        break;
+                                    }
+                                    
+                                    // 如果前面是分号、大括号、换行，不加分号
+                                    if ($prevChar === ';' || $prevChar === '{' || $prevChar === '}' 
+                                        || $prevChar === "\n" || $prevChar === "\r") {
+                                        break;
+                                    }
+                                    
+                                    // 其他情况：插入分号
+                                    $result .= ';';
+                                    break;
+                                }
+                            }
+                            break; // 找到关键字，跳出循环
+                        }
                     }
                 }
             }
+            
+            $result .= $char;
         }
-
+        
         return $result;
     }
 
