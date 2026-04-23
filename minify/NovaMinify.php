@@ -289,32 +289,32 @@ class NovaMinify
     /**
      * 自动补全 JS 代码缺失的分号
      * 原理：检测关键字位置，判断是否在顶层（通过括号匹配），在顶层关键字前插入分号
-     * 
-     * @param string $code JS 代码
+     *
+     * @param  string $code JS 代码
      * @return string 补全分号后的代码
      */
     private static function ensureSemicolons(string $code): string
     {
         // 语句开始的关键字
-        $keywords = ['var', 'let', 'const', 'function', 'class', 'if', 'for', 
-                     'while', 'do', 'switch', 'return', 'throw', 'break', 
-                     'continue', 'try', 'catch', 'finally', 'import', 'export',
-                     'async', 'await', 'case', 'default'];
-        
+        $keywords = ['var', 'let', 'const', 'function', 'class', 'if', 'for',
+            'while', 'do', 'switch', 'return', 'throw', 'break',
+            'continue', 'try', 'catch', 'finally', 'import', 'export',
+            'async', 'await', 'case', 'default'];
+
         $result = '';
         $len = strlen($code);
         $depth = 0; // 括号嵌套深度
-        
+
         for ($i = 0; $i < $len; $i++) {
             $char = $code[$i];
-            
+
             // 括号计数
             if ($char === '{' || $char === '(' || $char === '[') {
                 $depth++;
             } elseif ($char === '}' || $char === ')' || $char === ']') {
                 $depth--;
             }
-            
+
             // 检测关键字（只在顶层）
             if ($depth === 0) {
                 foreach ($keywords as $kw) {
@@ -329,20 +329,20 @@ class NovaMinify
                                 $prevChar = $code[$j];
                                 if (trim($prevChar) !== '') {
                                     // 操作符（说明关键字在表达式中，不是语句开始）
-                                    $operators = ['=', '+', '-', '*', '/', '%', '&', '|', 
-                                                  '^', '!', '?', ':', '<', '>', ',', '(', '['];
-                                    
+                                    $operators = ['=', '+', '-', '*', '/', '%', '&', '|',
+                                        '^', '!', '?', ':', '<', '>', ',', '(', '['];
+
                                     // 如果前面是操作符，不加分号
                                     if (in_array($prevChar, $operators, true)) {
                                         break;
                                     }
-                                    
+
                                     // 如果前面是分号、大括号、换行，不加分号
-                                    if ($prevChar === ';' || $prevChar === '{' || $prevChar === '}' 
+                                    if ($prevChar === ';' || $prevChar === '{' || $prevChar === '}'
                                         || $prevChar === "\n" || $prevChar === "\r") {
                                         break;
                                     }
-                                    
+
                                     // 其他情况：插入分号
                                     $result .= ';';
                                     break;
@@ -353,10 +353,10 @@ class NovaMinify
                     }
                 }
             }
-            
+
             $result .= $char;
         }
-        
+
         return $result;
     }
 
@@ -376,7 +376,6 @@ class NovaMinify
             return true;
         }
 
-
         return false;
     }
 
@@ -390,7 +389,6 @@ class NovaMinify
         if (self::isModernJs($input)) {
             return $input;
         }
-
 
         try {
             // 先补全分号（处理无分号风格），再压缩
