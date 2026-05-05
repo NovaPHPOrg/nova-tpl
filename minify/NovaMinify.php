@@ -366,8 +366,8 @@ class NovaMinify
      * 使用 JsMinify 进行专业压缩
      * 在压缩前自动补全缺失的分号，兼容无分号代码风格
      *
-     * @param  string $input 原始 JS
-     * @return string 压缩后的 JS
+     * @param string $code
+     * @return bool 压缩后的 JS
      */
     private static function isModernJs(string $code): bool
     {
@@ -379,9 +379,28 @@ class NovaMinify
         return false;
     }
 
+static function isMinifiedJs(string $input) {
+    $totalChars = strlen($input);
+    if ($totalChars === 0) return false;
+
+    $lineBreaks = substr_count($input, "\n");
+    // 如果没有任何换行，且代码较长，肯定是压缩的
+    if ($lineBreaks === 0 && $totalChars > 200) return true;
+
+    // 计算平均每行的字符数
+    $avgCharsPerLine = $totalChars / ($lineBreaks + 1);
+
+    // 如果平均每行超过 200 个字符，判定为压缩
+    return $avgCharsPerLine > 200;
+}
+
     public static function minifyJs(string $input): string
     {
         if (trim($input) === "") {
+            return $input;
+        }
+
+        if (self::isMinifiedJs($input)) {
             return $input;
         }
 
