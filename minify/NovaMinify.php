@@ -13,8 +13,10 @@ declare(strict_types=1);
 namespace nova\plugin\tpl\minify;
 
 use Exception;
-use nova\framework\core\Context;
+
 use function nova\framework\config;
+
+use nova\framework\core\Context;
 
 /**
  * 资源压缩处理器
@@ -37,7 +39,7 @@ class NovaMinify
      *
      * 优化：使用 pathinfo 提取扩展名，性能更好
      *
-     * @param string $file 文件路径
+     * @param  string $file 文件路径
      * @return bool   true 表示已处理并输出，false 表示继续默认流程
      */
     public static function handleStaticFile(string $file): bool
@@ -97,14 +99,18 @@ class NovaMinify
         }
     }
 
-    static function isMinifiedJs(string $input)
+    public static function isMinifiedJs(string $input)
     {
         $totalChars = strlen($input);
-        if ($totalChars === 0) return false;
+        if ($totalChars === 0) {
+            return false;
+        }
 
         $lineBreaks = substr_count($input, "\n");
         // 如果没有任何换行，且代码较长，肯定是压缩的
-        if ($lineBreaks === 0 && $totalChars > 200) return true;
+        if ($lineBreaks === 0 && $totalChars > 200) {
+            return true;
+        }
 
         // 计算平均每行的字符数
         $avgCharsPerLine = $totalChars / ($lineBreaks + 1);
@@ -119,8 +125,8 @@ class NovaMinify
      * 使用 JsMinify 进行专业压缩
      * 在压缩前自动补全缺失的分号，兼容无分号代码风格
      *
-     * @param string $code
-     * @return bool 压缩后的 JS
+     * @param  string $code
+     * @return bool   压缩后的 JS
      */
     private static function isModernJs(string $code): bool
     {
@@ -136,7 +142,7 @@ class NovaMinify
      * 自动补全 JS 代码缺失的分号
      * 原理：检测关键字位置，判断是否在顶层（通过括号匹配），在顶层关键字前插入分号
      *
-     * @param string $code JS 代码
+     * @param  string $code JS 代码
      * @return string 补全分号后的代码
      */
     private static function ensureSemicolons(string $code): string
@@ -216,7 +222,7 @@ class NovaMinify
      * - 优化属性值（0.6 → .6，0px → 0）
      * - 移除空选择器
      *
-     * @param string $input 原始 CSS
+     * @param  string $input 原始 CSS
      * @return string 压缩后的 CSS
      */
     public static function minifyCss(string $input): string
@@ -277,7 +283,7 @@ class NovaMinify
     /**
      * 压缩 HTML 内容
      *
-     * @param string $rawInput 原始 HTML
+     * @param  string $rawInput 原始 HTML
      * @return string 压缩后的 HTML
      */
     public static function minifyHtml(string $rawInput): string
@@ -304,10 +310,10 @@ class NovaMinify
             '#<([^\/\s<>!]+)(?:\s+([^<>]*?)\s*|\s*)(\/?)>#s',
             function ($matches) {
                 return '<' . $matches[1] . preg_replace(
-                        '#([^\s=]+)(\=([\'"]?)(.*?)\3)?(\s+|$)#s',
-                        ' $1$2',
-                        $matches[2]
-                    ) . $matches[3] . '>';
+                    '#([^\s=]+)(\=([\'"]?)(.*?)\3)?(\s+|$)#s',
+                    ' $1$2',
+                    $matches[2]
+                ) . $matches[3] . '>';
             },
             str_replace("\r", "", $input)
         );
