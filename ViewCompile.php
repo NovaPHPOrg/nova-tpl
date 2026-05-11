@@ -72,11 +72,6 @@ class ViewCompile
     }
 
     /**
-     * 编译模板
-     * @param         $tplFile
-     * @return string
-     */
-    /**
      * 编译模板（若已编译且未过期则复用）。
      * 1. 支持相对名称 -> 绝对路径解析
      * 2. 支持缺失时向父目录逐层搜索（最多 3 层）
@@ -134,10 +129,92 @@ class ViewCompile
 
     private function compileContent(string $content, string $dir): string
     {
+        // 1. 必须先执行基础结构编译，让引擎先把 $node.sub 转换为 $node['sub']
         $content = $this->_compile_struct($content, $dir);
+
+        // 2. 再执行高级组件(function/call)编译，这样就能正确解析到 $node['sub'] 数组了
+        $content = $this->_compile_custom_tags($content);
+
         $content = $this->_compile_function($content);
         $content = '<?php declare(strict_types=1); namespace nova\plugin\tpl; if(!class_exists("' . str_replace("\\", "\\\\", ViewResponse::class) . '", false)) exit("[ Nova ] Render Error. ");?>' . $content;
         return $content;
+    }
+    /**
+     * [新增功能] 编译 {function} 和 {call} 语法
+     */
+    private function _compile_custom_tags(string $template_data): string
+    {
+        $ld = preg_quote($this->left_delimiter, '/');
+        $rd = preg_quote($this->right_delimiter, '/');
+
+        // 1. 编译 {function name="renderMenu" items=[] prefix=''}
+        $template_data = preg_replace_callback(
+            '/' . $ld . '\s*function\s+name=(["\'])([\w_]+)\1\s*(.*?)\s*' . $rd . '/i',
+            function ($matches) {
+                $name = $matches[2];
+                $defaultsStr = $matches[3];
+                $defaults = $this->_parse_attributes($defaultsStr);
+
+                // 使用闭包(Closure)与引用传递来实现递归支持
+                $php = "<?php\n";
+                $php .= "if (!isset(\$tpl_func_{$name})) {\n";
+                $php .= "    \$tpl_func_{$name} = function(\$__params = []) use (&\$tpl_func_{$name}) {\n";
+                if ($defaults !== 'array()') {
+                    $php .= "        \$__defaults = {$defaults};\n";
+                    $php .= "        \$__params = array_merge(\$__defaults, \$__params);\n";
+                }
+                $php .= "        extract(\$__params, EXTR_OVERWRITE);\n";
+                $php .= "?>";
+                return $php;
+            },
+            $template_data
+        );
+
+        // 2. 编译 {/function}
+        $template_data = preg_replace(
+            '/' . $ld . '\s*\/function\s*' . $rd . '/i',
+            '<?php }; } ?>',
+            $template_data
+        );
+
+        // 3. 编译 {call name="renderMenu" items=$myItems}
+        $template_data = preg_replace_callback(
+            '/' . $ld . '\s*call\s+name=(["\'])([\w_]+)\1\s*(.*?)\s*' . $rd . '/i',
+            function ($matches) {
+                $name = $matches[2];
+                $paramsStr = $matches[3];
+                $params = $this->_parse_attributes($paramsStr);
+
+                // 将外层的所有环境变量($GLOBALS和局部)合并给调用组件，防止外层变量丢失
+                return "<?php \$tpl_func_{$name}(array_merge(get_defined_vars(), {$params})); ?>";
+            },
+            $template_data
+        );
+
+        return $template_data;
+    }
+
+    /**
+     * [新增辅助方法] 解析模板标签参数转为 PHP array 代码
+     */
+    private function _parse_attributes(string $string): string
+    {
+        // 匹配 key=value 键值对，增加了对 [] 的支持
+        $pattern = '/\b([-\w]+?)\s*=\s*(\$[\w"\'\]\[\-_>\$]+|"[^"\\\\]*(?:\\\\.[^"\\\\]*)*"|\'[^\'\\\\]*(?:\\\\.[^\'\\\\]*)*\'|\[\]|([->\w]+))/';
+        if (preg_match_all($pattern, $string, $matches, PREG_SET_ORDER)) {
+            $params = "array(";
+            foreach ($matches as $m) {
+                $val = $m[2];
+                // 转换 [] 为标准的 php 数组声明
+                if ($val === '[]') {
+                    $val = 'array()';
+                }
+                $params .= '\'' . $m[1] . "'=>" . $val . ", ";
+            }
+            $params .= ")";
+            return $params;
+        }
+        return "array()";
     }
 
     /**
@@ -202,6 +279,7 @@ class ViewCompile
 
         return $template_data;
     }
+
     /**
      * 函数编译
      * @param  string               $template_data
