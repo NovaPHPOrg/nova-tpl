@@ -1,312 +1,255 @@
 # TPL 插件
 
-## 架构概览
+面向 Nova 应用的模板编译、错误页、静态资源与输出压缩。入口为 `Handler::registerInfo()`，在 `framework_start` 中由 `package.php` 注册。
 
-TPL 插件提供完整的模板渲染、静态资源处理和性能优化功能。
+## 目录结构
 
 ```
 nova/plugin/tpl/
-│
-├── Handler.php              ← 统一注册器（插件入口）
-│
-├── handler/                 ← 业务处理器
-│   ├── TplHandler.php       - 错误页面处理
-│   └── StaticHandler.php    - 静态资源 + Bundle
-│
-├── minify/                  ← 资源压缩
-│   ├── NovaMinify.php       - HTML/CSS/JS 压缩
-│   └── JsMinify.php         - JS 专业压缩
-│
-├── error/                   ← 错误页面模板
-│   ├── error.tpl
-│   └── layout.tpl
-│
-├── ViewResponse.php         ← 视图响应
-├── ViewCompile.php          ← 模板编译
-└── package.php              ← 插件配置
+├── Handler.php              # 事件注册（插件入口）
+├── handler/
+│   ├── TplHandler.php       # 以 URI 后缀匹配的错误页（AppExitException）
+│   └── StaticHandler.php    # /static/ 与 /static/bundle
+├── minify/
+│   ├── NovaMinify.php       # HTML/CSS/JS 压缩与静态直出
+│   └── JsMinify.php         # JS 压缩实现（JShrink 系）
+├── error/
+│   ├── error.tpl            # 错误片段（PJAX 主体）
+│   └── layout.tpl           # 整页布局（非 PJAX）
+├── ViewResponse.php         # 视图路径解析、编译、渲染
+├── ViewCompile.php          # .tpl → PHP 编译
+├── ViewException.php        # 视图异常（继承 ControllerException）
+└── package.php
 ```
 
 ---
 
-## 核心功能
+## 模板语法
 
-### 1. **错误页面处理** - TplHandler
+定界符默认为 `{` 与 `}`，可在 `ViewResponse::init()` 中修改。编译顺序在 `ViewCompile::compileContent()` 中固定：**先结构（`_compile_struct`）→ 再 `{function}` / `{call}`（`_compile_custom_tags`）→ 最后剩余 `{tag ...}` 走函数回调（`_compile_function`）**。
 
-处理 HTTP 错误码页面（400, 401, 403, 404, 500等）
+### 注释与原始输出
 
-**功能：**
-- 标准错误页面渲染
-- Session 自定义错误信息
-- PJAX 局部刷新支持
+| 写法 | 含义 |
+|------|------|
+| `{* ... *}` | 模板注释，编译为 PHP 块注释 |
+| `{~ expr }` | 原样 `echo`，不做 HTML 转义（注意 XSS） |
 
-**使用：**
-```php
-// 自动拦截 /400, /404, /500 等路由
-// 无需手动调用
+### 变量与输出
+
+| 写法 | 含义 |
+|------|------|
+| `{$var}` | `htmlspecialchars(strval($var), ENT_QUOTES, "UTF-8")` |
+| `{$var nofilter}` | `strval($var)`，不转义 |
+| `{$obj->prop}` | 对象属性，`strval` 后输出 |
+| `{$a.b}` | 转为 `$a['b']` 后再按普通变量规则参与后续匹配（多层点号依赖正则多次替换） |
+
+### 运算符与空合并
+
+| 写法 | 含义 |
+|------|------|
+| `{expr ? a : b}` | 三元，`echo strval(expr ? a : b)`（`expr` 与分支须能被当前正则正确吃掉，复杂表达式建议拆变量） |
+| `{a or b}` | PHP `??`：`echo strval(a ?? b)` |
+
+### 赋值
+
+| 写法 | 含义 |
+|------|------|
+| `{$x = expr}` | `<?php $x = expr; ?>` |
+
+### 控制流
+
+| 写法 | 含义 |
+|------|------|
+| `{if cond}` / `{else if cond}` / `{else}` / `{/if}` | 标准 `if / elseif / else / endif` |
+| `{while cond}` / `{/while}` | `while / endwhile` |
+| `{break}` / `{continue}` | 同 PHP |
+| `{foreach $arr as $item}` / `{foreach $arr as $k => $v}` / `{/foreach}` | `foreach`；循环内可用 `$item@index`、`$item@iteration`、`$item@first`、`$item@last`、`$item@total`（实现为 `$_foreach_<name>_*` 变量） |
+
+### 包含
+
+| 写法 | 含义 |
+|------|------|
+| `{include file=xxx}` | `xxx` 相对**当前模板所在目录**；内部调用 `$this->compile($dir.'/'.$xxx)`，再 `include` 编译结果 |
+
+### 组件：`{function}` / `{call}`
+
+定义可复用片段（实现为闭包变量 `$tpl_func_<name>`，支持递归）：
+
+```text
+{function name="blockName" items=[] prefix=""}
+    {foreach $items as $item}
+        {$prefix}{$item}
+    {/foreach}
+{/function}
+
+{call name="blockName" items=$list prefix="-"}
 ```
+
+- `name`：字母数字下划线。
+- 属性列表解析为 PHP `array(...)`；`[]` 会写成 `array()`。
+- `{call ...}` 会 `array_merge(get_defined_vars(), <解析出的数组>)` 再调用，以便继承外层变量。
+
+### 其它 `{name ...}` 标签
+
+未被上述规则消费的 `{word ...}` 会进入 `_compile_function`：
+
+- `{foo()}` → `echo foo();`
+- `{foo(...)}` → 括号内解析为 `foo` 的参数或命名参数数组，生成 `echo foo(...);`
+- `{unset(...)}` → 生成 `unset(...);`（无 `echo`）
+
+### 编译缓存与解析
+
+- 编译输出目录：`ROOT_PATH/runtime/view/`，文件名为 `md5(模板绝对路径).php`。
+- 源文件 `mtime` 新于编译文件则重新编译。
+- `compile($tplFile)`：无目录分隔符的短名会补 `template_dir` 与 `.tpl`；找不到时向父目录**最多上溯 3 层**查找；仍失败抛出 `RuntimeException`。
+- 编译后的 PHP 文件头部会校验 `ViewResponse` 类是否存在，防止被直接当 URL 访问执行。
+
+### 视图路径（`ViewResponse::getViewFile`）
+
+在 `asTpl($view, ...)` 中解析真实 `.tpl` 路径，顺序为（有路由时）：
+
+1. `{template_dir}/{module}/{controller小写}/{view}.tpl`
+2. `{template_dir}/{module}/{view}.tpl`
+3. `{template_dir}/{view}.tpl`
+
+若 `$view` 以 `ROOT_PATH/` 开头，还会尝试 `{view}.tpl`。找不到时抛出 `ViewException`，消息中带出已尝试路径。
 
 ---
 
-### 2. **静态资源处理** - StaticHandler
+## 错误处理
 
-处理 `/static/` 路径下的所有静态文件
+### HTTP 错误页：`TplHandler`
 
-**功能：**
-- 静态文件路由分发
-- bootloader.js 注入 debug 和 version 信息
+在 `route.before` 中根据 **URI 是否以 `/\{code\}` 结尾** 匹配（如 `/404`、`/500`）。命中后抛出 `AppExitException`，携带已渲染的 `Response`，中断后续路由。
 
-**使用：**
-```html
-<!-- 自动处理 -->
-<script src="/static/framework/utils/Logger.js"></script>
-```
+| 后缀 | 行为 |
+|------|------|
+| `/400` … `/504` | 使用内置文案映射 `ERROR_MAP` |
+| `/error` | 从 Session 读取 `error_title`、`error_message`、`error_sub_message`；若无 `nova\plugin\cookie\Session` 类则退回 400 文案 |
 
----
+**PJAX**（`request()->isPjax() === true`）：直接 `asTpl('error', [...])`，返回 `error/error.tpl` 片段。
 
-### 3. **Bundle 合并** - StaticHandler
+**非 PJAX**：`asTpl('layout')`，仅注入 `title` 等初始化数据；页面再通过 PJAX 加载当前 `pathname`，第二次请求通常为 PJAX，从而拿到 `error.tpl` 内容。接入方需保证 `layout.tpl` 与前端 PJAX 逻辑一致。
 
-将多个 JS/CSS 文件合并成一个请求
+### 模板与渲染：`ViewException`
 
-**API：**
-```
-GET /static/bundle?file=file1.js,file2.js&type=js&v=1.0
-```
+- `ViewCompile` 构造时视图文件不存在、或 layout 与视图为同一文件：抛出 `ViewException`。
+- `ViewResponse::dynamicCompilation()` 捕获一般 `Exception` 后包装为 `ViewException`（`AppExitException` 原样向上抛出，供框架正常退出）。
+- `ViewException` 构造会写错误日志；可选记录 `tpl` 路径（当前构造调用处多数只传 message，模板路径字段可能为空）。
 
-**参数：**
-| 参数 | 必需 | 说明 |
-|------|------|------|
-| `file` | ✅ | 逗号分隔的文件列表 |
-| `type` | ✅ | 文件类型：`js` 或 `css` |
-| `v` | ❌ | 版本号（缓存控制） |
+### 静态与 Bundle
 
-**示例：**
-```html
-<!-- 合并 7 个框架核心文件 -->
-<script src="/static/bundle?file=framework/bootloader.js,framework/utils/Logger.js,framework/utils/Loader.js&type=js&v=1.0"></script>
-
-<!-- 合并多个 CSS -->
-<link rel="stylesheet" href="/static/bundle?file=css/base.css,css/theme.css&type=css&v=1.0">
-```
-
-**安全限制：**
-- ✅ 文件必须在 `/app/static/` 目录下
-- ✅ 使用 `realpath()` 防止路径穿越
-- ✅ 扩展名必须与 type 一致
-- ✅ 不存在的文件静默跳过
-
-**性能优化：**
-- ETag 缓存（xxh64 哈希，比 md5 快 3-5倍）
-- 304 Not Modified 支持
-- 10天缓存（`max-age=864000`）
+- **Bundle**：参数非法、无有效文件、类型非 `js`/`css` 时返回 **400** 纯文本说明（`ResponseType::RAW`）；`If-None-Match` 命中则 **304**。
+- **普通 `/static/`**：将 URI 中 `..` 置空后映射到 `ROOT_PATH/app/static/`；**不做 `realpath` 约束**，与 bundle 的校验强度不同，部署时应避免依赖「仅剔除 `..`」作为唯一防护。
 
 ---
 
-### 4. **资源压缩** - NovaMinify
+## 代码压缩（NovaMinify）
 
-自动压缩 HTML/CSS/JS，减少传输体积
+### 触发点（与 `Handler` 一致）
 
-**功能：**
-- 移除注释和空格
-- 简化属性值
-- 优化颜色代码
-- 跳过已压缩文件（`.min.js`, `.min.css`）
+1. **`response.static.before`**：`NovaMinify::handleStaticFile($file)`  
+   - 对 **单个** 静态请求的 `.js` / `.css` / `.html|.htm`：`echo` 压缩后的内容并返回 `true`（由框架决定是否短路后续输出）。  
+   - `filename` 以 `.min` 结尾（即 `*.min.js` 等）跳过压缩，返回 `false`。
 
-**压缩效果：**
-- HTML：约 20-30% 体积减少
-- CSS：约 30-40% 体积减少
-- JS：约 40-50% 体积减少
+2. **`response.html.before`**：`$data = NovaMinify::minifyHtml($data)`  
+   - 整页 HTML 在发出前压缩。
 
-**使用：**
-```php
-// 自动压缩所有响应，无需手动调用
-```
+### JavaScript
+
+- 入口：`NovaMinify::minifyJs()` → 必要时 `ensureSemicolons()` → `JsMinify::minify()`（基于 JShrink 思路的实现）。
+- **跳过压缩**：空串；`isMinifiedJs()` 判定已压；含 `import`/`export` 的模块脚本（`isModernJs()`）原样返回，避免旧压缩器破坏语法。
+- **失败**：`JsMinify::minify` 抛异常时捕获，回退为**仅** `ensureSemicolons($input)` 后的源码，不中断响应。
+
+### CSS
+
+- `minifyCss()`：多轮 `preg_replace` 去注释（保留 `/*!`）、空白、`0.6→.6`、部分颜色缩写、`border:none→0`、去空选择器等。  
+- 依赖正则，极端或非标准写法可能改变语义；出问题时应先对比压缩前后。
+
+### HTML
+
+- `replaceVersion()`：将字面量 `[version]`、`[debug]` 替换为当前配置/调试状态（与 `Context::isDebug()`、`config('version')` 相关）。
+- **`<pre>...</pre>`** 用占位符保护，避免压扁。
+- 内联 `style`、`style` 块、`script` 块分别走 `minifyCss` / `minifyJs`。
+- 若某步 `preg_replace` 返回 `null`，回退为压缩前字符串，避免白屏。
+
+### Bundle 合并（`StaticHandler::bundleFiles`）
+
+- 非 `.min` 的 JS/CSS 在合并时分别调用 `NovaMinify::minifyJs` / `minifyCss`；已带 `.min` 的文件原样拼接。
+- **仅 JS bundle** 注入：`window.loadedResources`、`window.debug`、`window.version`（版本在调试模式下为时间戳）；并为每个文件写 `window.loadedResources['{uri}/static/{file}'] = true`。
+- **CSS bundle**：抽取各文件中的 `@import` 到输出靠前位置，再拼接正文。
 
 ---
 
-## 性能优化总结
+## 静态与 Bundle API
 
-| 优化项 | 技术方案 | 提升 |
-|--------|---------|------|
-| **Bundle合并** | 7个请求 → 1个请求 | **-600ms** |
-| **ETag生成** | xxh64 vs md5 | **3-5倍** |
-| **扩展名检查** | pathinfo vs 正则 | **3-5倍** |
-| **文件合并** | 数组累积 vs 字符串拼接 | **30-50%** |
-| **资源压缩** | HTML/CSS/JS minify | **20-50%** |
+**普通文件**：`GET /static/{相对 app/static 的路径}`，URI 中的 `..` 会被删除。
 
-**总计：首屏加载时间减少约 1-1.5秒** 🚀
+**合并**：
+
+```http
+GET /static/bundle?file=a.js,b.js&type=js&v=1.0
+GET /static/bundle?file=a.css,b.css&type=css&v=1.0
+```
+
+- `file`：逗号分隔，路径相对 `app/static`，可带或不带 `static/` 前缀；**逐项** `realpath`，必须落在 `app/static` 下且扩展名与 `type` 一致；非法项**跳过**而非整体失败。  
+- 若**没有任何**有效文件 → 400。  
+- 缓存：`ETag`（优先 `xxh64`，否则 `md5`），`Cache-Control: public, max-age=864000`。
 
 ---
 
-## 事件监听顺序
-
-Handler.php 注册的事件执行顺序：
+## 事件流（当前实现）
 
 ```
-1. route.before
-   ├── TplHandler::handleErrorPage($uri)
-   └── StaticHandler::handleStaticRoute($uri)
+route.before
+  → TplHandler::handleErrorPage($uri)
+  → StaticHandler::handleStaticRoute($uri)
 
-2. response.static.before
-   └── NovaMinify::handleStaticFile($file)  # 压缩
+response.static.before
+  → NovaMinify::handleStaticFile($file)
 
-3. response.static.after
-   └── StaticHandler::handleJsFileMarker($file)  # 添加标记
-
-4. response.html.before
-   └── NovaMinify::minifyHtml($data)  # HTML压缩
+response.html.before
+  → NovaMinify::minifyHtml($data)
 ```
 
 ---
 
 ## 配置
 
-### package.php
+`package.php`：
 
 ```php
 return [
     "config" => [
         "framework_start" => [
-            "nova\\plugin\\tpl\\Handler",  // 统一注册入口
-        ]
+            "nova\\plugin\\tpl\\Handler",
+        ],
     ],
 ];
 ```
 
 ---
 
-## 开发建议
+## 扩展与测试提示
 
-### 1. 添加新的处理器
-
-创建新的处理器类：
-```php
-namespace nova\plugin\tpl\handler;
-
-class NewHandler
-{
-    public static function handle(): void
-    {
-        // 业务逻辑
-    }
-}
-```
-
-在 Handler.php 中注册：
-```php
-EventManager::addListener("some.event", function ($event, $data) {
-    NewHandler::handle();
-});
-```
-
-### 2. 自定义 Bundle 预设
-
-在 StaticHandler 中添加预设：
-```php
-// 支持 ?file=admin 快捷方式
-if ($files === 'admin') {
-    $fileList = ['js/admin.js', 'js/dashboard.js', ...];
-}
-```
-
-### 3. 扩展压缩器
-
-在 NovaMinify 中添加新的压缩方法：
-```php
-public static function minifyJson(string $input): string
-{
-    return json_encode(json_decode($input), JSON_UNESCAPED_UNICODE);
-}
-```
-
----
-
-## 设计原则
-
-### 关注点分离
-
-- **Handler.php**：只负责注册（框架层）
-- **业务类**：只负责逻辑（业务层）
-- **不混合**：注册和业务分开
-
-### 单一职责
-
-- **TplHandler**：只处理错误页面
-- **StaticHandler**：只处理静态资源
-- **NovaMinify**：只处理压缩
-
-### 可测试性
-
-所有业务方法都是 `public static`，可以独立测试：
-
-```php
-// 单元测试
-$result = StaticHandler::validateStaticPath('test.js', 'js');
-$compressed = NovaMinify::minifyCss($input);
-```
-
----
-
-## 性能监控
-
-### 查看 Bundle 内容
-
-浏览器开发者工具 → Network → bundle：
-
-```javascript
-/* Framework Bundle - Auto Generated */
-/* Version: 1.0 */
-/* Type: js */
-/* Generated: 2025-11-15 10:30:45 */
-/* Files: bootloader.js, Logger.js, Loader.js */
-```
-
-### 验证缓存
-
-1. 首次加载：`200 OK`
-2. 刷新页面：`304 Not Modified`
-3. 修改版本：`200 OK`（强制刷新）
-
-### 压缩率检查
-
-查看响应大小：
-- 原始：`Content-Length: 100KB`
-- 压缩后：`Content-Length: 60KB`（约 40% 减少）
+- 新逻辑优先挂到 `EventManager` 的合适阶段，保持 `Handler.php` 只做注册。
+- `ViewCompile` / `NovaMinify` 的方法多为 `public static`，便于单测；模板编译注意正则顺序导致的边界问题（复杂表达式优先在控制器中算好再传入模板）。
 
 ---
 
 ## 故障排查
 
-### Bundle 返回 400
-
-**可能原因：**
-- 缺少 `file` 参数
-- 缺少 `type` 参数
-- `type` 不是 `js` 或 `css`
-
-### 文件未加载
-
-**检查：**
-1. 文件是否在 `/app/static/` 目录下
-2. 路径是否包含 `..`
-3. 扩展名是否与 `type` 匹配
-
-### 压缩后代码出错
-
-**解决：**
-- JS：可能是 JsMinify 压缩错误，添加异常捕获
-- CSS：检查是否有特殊语法（如 CSS变量）
-- HTML：检查 `<pre>` 标签是否被正确保留
-
----
-
-## 贡献者
-
-- **Ankio** - 初始架构和优化
-- **Linus Torvalds (AI)** - 性能优化建议和代码审查
+| 现象 | 排查 |
+|------|------|
+| Bundle 400 | 是否缺少 `file`/`type`；`type` 是否仅为 `js` 或 `css`；列表是否全部校验失败 |
+| 静态 404 | 文件是否在 `app/static`；bundle 路径是否被 `realpath` 拒绝 |
+| 模板报错 | 看 `ViewException` 消息与日志；检查 `runtime/view` 缓存是否需删 |
+| JS 压缩后运行错误 | 是否为现代语法/ESM（应自动跳过）；或 `JsMinify` 失败仅做了分号补齐——应用构建链上应使用 terser/esbuild 等 |
+| HTML 被压坏 | 检查 `preg` 是否误伤非常规标签；`pre` 是否成对 |
 
 ---
 
 ## License
 
-Copyright (c) 2025. All rights reserved.
-
+Copyright (c) 2025–2026. All rights reserved.
