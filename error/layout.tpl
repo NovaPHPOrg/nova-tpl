@@ -48,7 +48,6 @@
     framework/language/NodeUtils.js,
     framework/language/TranslateUtils.js,
     framework/language/Language.js,
-framework/pjax/pjax.min.js,
 framework/pjax/nprogress.js,
 framework/pjax/PjaxUtils.js,
     &type=js&v={$__v}"></script>
@@ -73,10 +72,10 @@ framework/pjax/PjaxUtils.js,
 
 
 <script>
-    let pjax = new PjaxUtils(true, function () {
+    let pjax = new PjaxUtils(function () {
 
     }, "/404");
-    pjax.loadUri(window.location.pathname);
+    pjax.loadUri(window.location.pathname + window.location.search, { history: false });
     $("[data-pjax-item]").on("click",function () {
         pjax.loadUri($(this).data("href"));
     });
