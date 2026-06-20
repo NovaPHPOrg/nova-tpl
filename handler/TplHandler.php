@@ -105,11 +105,6 @@ class TplHandler
                 continue;
             }
 
-            // 处理自定义错误信息
-            if ($code === "error") {
-                $errorInfo = self::getCustomErrorInfo();
-            }
-
             // 渲染错误页面
             throw new AppExitException(
                 self::renderErrorResponse($errorInfo)
@@ -118,33 +113,12 @@ class TplHandler
     }
 
     /**
-     * 获取自定义错误信息（从Session）
-     *
-     * @return array 错误信息数组
-     */
-    private static function getCustomErrorInfo(): array
-    {
-        // 如果Session类不存在，返回默认400错误
-        if (!class_exists('\nova\plugin\cookie\Session')) {
-            return self::ERROR_MAP["400"];
-        }
-
-        $session = \nova\plugin\cookie\Session::getInstance();
-
-        return [
-            "error_title" => $session->get("error_title") ?: self::ERROR_MAP["400"]["error_title"],
-            "error_message" => $session->get("error_message") ?: self::ERROR_MAP["400"]["error_message"],
-            "error_sub_message" => $session->get("error_sub_message") ?: '',
-        ];
-    }
-
-    /**
      * 渲染错误响应
      *
      * @param  array        $errorInfo 错误信息
      * @return ViewResponse 视图响应对象
      */
-    private static function renderErrorResponse(array $errorInfo): Response
+    public static function renderErrorResponse(array $errorInfo): Response
     {
         $viewResponse = new ViewResponse();
         $viewResponse->init(
@@ -157,11 +131,7 @@ class TplHandler
 
         // PJAX 请求：只返回错误页面内容
         if (Context::instance()->request()->isPjax()) {
-            return $viewResponse->asTpl("error", [
-                "error_title" => $errorInfo["error_title"],
-                "error_message" => $errorInfo["error_message"],
-                "error_sub_message" => $errorInfo["error_sub_message"],
-            ]);
+            return $viewResponse->asTpl("error", $errorInfo);
         }
 
         // 完整页面请求：返回包含布局的页面

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace nova\plugin\tpl;
 
 use nova\framework\http\Response;
+use nova\plugin\tpl\handler\TplHandler;
 
 class Pjax
 {
@@ -20,37 +21,108 @@ class Pjax
         if (!$pjax) {
             return Response::asRedirect($link);
         }
-
-        // HTML上下文编码
-        $htmlUrl = htmlspecialchars(
-            $link,
-            ENT_QUOTES | ENT_SUBSTITUTE,
-            'UTF-8'
-        );
-
-        // JS上下文编码
-        $jsUrl = json_encode(
-            $link,
-            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
-        );
-
         return Response::asHtml(
             <<<HTML
-<meta http-equiv="refresh" content="0;url=$htmlUrl">
+<meta http-equiv="refresh" content="0;url=$link">
 <title id="title">302 Redirect</title> 
 <style id="style"></style> 
-<div id="container" class="container"></div> 
+<div id="container" class="container">
+<noscript>
+    <a href="{$link}">Continue</a>
+</noscript>
+</div> 
 <script id="script"> 
 window.pageLoadFiles = []; 
 window.pageOnLoad = function (loading) { 
-    location.replace('$jsUrl'); 
+    location.replace('$link'); 
     return false 
 };
 </script>
-<noscript>
-    <a href="{$htmlUrl}">Continue</a>
-</noscript>
+
 HTML
         );
     }
+
+    /**
+     * HTTP状态码与错误信息的映射
+     */
+    private const array ERROR_MAP = [
+        400 => [
+            "error_title" => "400 Bad Request",
+            "error_message" => "错误的请求",
+            "error_sub_message" => "抱歉，您的请求有误，请检查后重试。",
+        ],
+        401 => [
+            "error_title" => "401 Unauthorized",
+            "error_message" => "未授权访问",
+            "error_sub_message" => "抱歉，您需要登录后才能访问该页面。",
+        ],
+        403 => [
+            "error_title" => "403 Forbidden",
+            "error_message" => "访问被禁止",
+            "error_sub_message" => "抱歉，您未获得访问该页面的权限。",
+        ],
+        404 => [
+            "error_title" => "404 Not Found",
+            "error_message" => "页面未找到",
+            "error_sub_message" => "抱歉，您访问的页面不存在或已被删除。",
+        ],
+        405 => [
+            "error_title" => "405 Method Not Allowed",
+            "error_message" => "请求方法不被允许",
+            "error_sub_message" => "抱歉，您请求的方式不被服务器支持。",
+        ],
+        500 => [
+            "error_title" => "500 Internal Server Error",
+            "error_message" => "服务器内部错误",
+            "error_sub_message" => "抱歉，服务器遇到错误，暂时无法处理您的请求。",
+        ],
+        502 => [
+            "error_title" => "502 Bad Gateway",
+            "error_message" => "错误的网关",
+            "error_sub_message" => "抱歉，服务器收到了无效的响应，请稍后再试。",
+        ],
+        503 => [
+            "error_title" => "503 Service Unavailable",
+            "error_message" => "服务暂不可用",
+            "error_sub_message" => "抱歉，服务器目前无法处理您的请求，请稍后再试。",
+        ],
+        504 => [
+            "error_title" => "504 Gateway Timeout",
+            "error_message" => "网关超时",
+            "error_sub_message" => "抱歉，服务器请求超时，请稍后再试。",
+        ],
+    ];
+
+    public static function responseError(int $code, string $title = null, string $message = null, string $sub_message = null): Response
+    {
+        $map = self::ERROR_MAP[$code] ?? [
+            "error_title" => $title,
+            "error_message" => $message,
+            "error_sub_message" => $sub_message,
+        ];
+
+        return TplHandler::renderErrorResponse($map);
+
+    }
+
+    public static function responseErrorJson(int $code, string $title = null, string $message = null, string $sub_message = null, string $data = null): Response
+    {
+        $map = self::ERROR_MAP[$code] ?? [
+            "error_title" => $title,
+            "error_message" => $message,
+            "error_sub_message" => $sub_message,
+            "error_data" => $data
+        ];
+
+        return Response::asJson([
+            'code' => $code,
+            'title' => $map['error_title'],
+            'msg' => $map['error_message'],
+            'sub_message' => $map['error_sub_message'],
+            'data' => $map['error_data'] ?? null,
+        ]);
+
+    }
+
 }
