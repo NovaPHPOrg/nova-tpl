@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace nova\plugin\tpl;
 
 use nova\framework\core\Logger;
+use RuntimeException;
 
 class ViewCompile
 {
@@ -105,7 +106,7 @@ class ViewCompile
             }
 
             if (!$found) {
-                throw new \RuntimeException("Template not found within 3 parent levels: {$base}");
+                throw new RuntimeException("Template not found within 3 parent levels: {$base}");
             }
         }
 

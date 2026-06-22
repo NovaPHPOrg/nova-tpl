@@ -12,6 +12,9 @@ declare(strict_types=1);
 
 namespace nova\plugin\tpl\minify;
 
+use Exception;
+use RuntimeException;
+
 /**
  * Minifier
  *
@@ -121,8 +124,8 @@ class JsMinify
      *
      * @param  string      $js      The raw javascript to be minified
      * @param  array       $options Various runtime options in an associative array
-     * @throws \Exception
      * @return bool|string
+     *@throws Exception
      */
     public static function minify($js, $options = [])
     {
@@ -133,7 +136,7 @@ class JsMinify
             $js = $jshrink->unlock($js);
             unset($jshrink);
             return $js;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             if (isset($jshrink)) {
                 // Since the breakdownScript function probably wasn't finished
                 // we clean it out before discarding it.
@@ -364,7 +367,7 @@ class JsMinify
      *
      *
      * @return string            The next character
-     * @throws \RuntimeException
+     * @throws RuntimeException
      */
     protected function peek()
     {
@@ -397,7 +400,7 @@ class JsMinify
      *
      *
      * @return string            Next 'real' character to be processed.
-     * @throws \RuntimeException
+     * @throws RuntimeException
      */
     protected function getReal(): string
     {
@@ -452,7 +455,7 @@ class JsMinify
      *
      * @param  int               $startIndex The index point where "getReal" function started
      * @return void
-     * @throws \RuntimeException Unclosed comments will throw an error
+     * @throws RuntimeException Unclosed comments will throw an error
      */
     protected function processMultiLineComments($startIndex)
     {
@@ -502,7 +505,7 @@ class JsMinify
         }
 
         if ($char === false) {
-            throw new \RuntimeException('Unclosed multiline comment at position: ' . ($this->index - 2));
+            throw new RuntimeException('Unclosed multiline comment at position: ' . ($this->index - 2));
         }
 
         // if we're here c is part of the comment and therefore tossed
@@ -538,7 +541,7 @@ class JsMinify
      * When a javascript string is detected this function crawls for the end of
      * it and saves the whole string.
      *
-     * @throws \RuntimeException Unclosed strings will throw an error
+     * @throws RuntimeException Unclosed strings will throw an error
      */
     protected function saveString()
     {
@@ -578,7 +581,7 @@ class JsMinify
                     if ($stringType === '`') {
                         $this->echo($this->a);
                     } else {
-                        throw new \RuntimeException('Unclosed string at position: ' . $startpos);
+                        throw new RuntimeException('Unclosed string at position: ' . $startpos);
                     }
                     break;
 
@@ -611,7 +614,7 @@ class JsMinify
      * When a regular expression is detected this function crawls for the end of
      * it and saves the whole regex.
      *
-     * @throws \RuntimeException Unclosed regex will throw an error
+     * @throws RuntimeException Unclosed regex will throw an error
      */
     protected function saveRegex()
     {
@@ -632,7 +635,7 @@ class JsMinify
             }
 
             if ($this->a === "\n") {
-                throw new \RuntimeException('Unclosed regex pattern at position: ' . $this->index);
+                throw new RuntimeException('Unclosed regex pattern at position: ' . $this->index);
             }
 
             $this->echo($this->a);
