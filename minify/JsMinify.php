@@ -125,7 +125,7 @@ class JsMinify
      * @param  string      $js      The raw javascript to be minified
      * @param  array       $options Various runtime options in an associative array
      * @return bool|string
-     *@throws Exception
+     * @throws Exception
      */
     public static function minify($js, $options = [])
     {
@@ -366,7 +366,7 @@ class JsMinify
      * This function returns the next character without moving the index forward.
      *
      *
-     * @return string            The next character
+     * @return string           The next character
      * @throws RuntimeException
      */
     protected function peek()
@@ -399,7 +399,7 @@ class JsMinify
      * c code) rather than in script php.
      *
      *
-     * @return string            Next 'real' character to be processed.
+     * @return string           Next 'real' character to be processed.
      * @throws RuntimeException
      */
     protected function getReal(): string
@@ -453,7 +453,7 @@ class JsMinify
      * Skips multiline comments where appropriate, and includes them where needed.
      * Conditional comments and "license" style blocks are preserved.
      *
-     * @param  int               $startIndex The index point where "getReal" function started
+     * @param  int              $startIndex The index point where "getReal" function started
      * @return void
      * @throws RuntimeException Unclosed comments will throw an error
      */
