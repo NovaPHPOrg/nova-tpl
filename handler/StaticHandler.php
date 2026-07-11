@@ -216,8 +216,10 @@ class StaticHandler
             return null;
         }
 
-        // 返回相对于 /app/static/ 的路径
-        return substr($realPath, strlen($staticDir) + 1);
+        // 返回相对于 /app/static/ 的路径（统一 /，供 URL 与 JS 字符串使用；Windows realpath 为 \）
+        $relative = substr($realPath, strlen($staticDir) + 1);
+
+        return str_replace('\\', '/', $relative);
     }
 
     /**
@@ -283,7 +285,8 @@ class StaticHandler
 
             $parts[] = "/* ========== End of {$filename} ========== */\n";
             if ($type == "js") {
-                $parts[] = "window.loadedResources['{$uri}/static/{$file}'] = true;";
+                $resourceKey = "{$uri}/static/{$file}";
+                $parts[] = 'window.loadedResources[' . json_encode($resourceKey, JSON_UNESCAPED_SLASHES) . '] = true;';
             }
         }
 
