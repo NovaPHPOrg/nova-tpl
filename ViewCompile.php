@@ -72,48 +72,64 @@ class ViewCompile
         return $this->template_name;
     }
 
-    /**
-     * 编译模板（若已编译且未过期则复用）。
-     * 1. 支持相对名称 -> 绝对路径解析
-     * 2. 支持缺失时向父目录逐层搜索（最多 3 层）
-     * 3. 统一判断是否需要重新编译
-     */
-    public function compile(string $tplFile): string
+    public function resolvePath(string $baseDir, string $file): string
     {
-        // ① 若传入的是相对路径（不含目录分隔符），补全模板目录及扩展名
-        if (!str_contains($tplFile, DS)) {
-            $tplFile = $this->template_dir . DS . rtrim($tplFile, DS);
+        if ($this->isAbsolutePath($file)) {
+            $tplFile = $file;
+        } else {
+            $tplFile = rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $baseDir), DIRECTORY_SEPARATOR)
+                . DIRECTORY_SEPARATOR
+                . ltrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $file), DIRECTORY_SEPARATOR);
             if (!str_ends_with($tplFile, '.tpl')) {
                 $tplFile .= '.tpl';
             }
         }
 
-        // ② 若文件不存在，则向上查找 ≤3 层
-        if (!file_exists($tplFile)) {
-            $pathInfo = pathinfo($tplFile);
-            $dir      = $pathInfo['dirname'];
-            $base     = $pathInfo['basename'];
-            $found    = false;
+        if (!is_file($tplFile)) {
+            $dir = dirname($tplFile);
+            $base = basename($tplFile);
 
-            for ($i = 0; $i < 3 && $dir !== DS; $i++) {
-                $dir       = dirname($dir);           // 上移一层
-                $candidate = $dir . DS . $base;
-                if (file_exists($candidate)) {
-                    $tplFile = $candidate;
-                    $found   = true;
+            for ($i = 0; $i < 3; $i++) {
+                $parent = dirname($dir);
+                if ($parent === $dir || $parent === '' || $parent === '.') {
                     break;
+                }
+                $dir = $parent;
+                $candidate = $dir . DIRECTORY_SEPARATOR . $base;
+                if (is_file($candidate)) {
+                    return $candidate;
                 }
             }
 
-            if (!$found) {
-                throw new RuntimeException("Template not found within 3 parent levels: {$base}");
-            }
+            throw new RuntimeException("Template not found within 3 parent levels: {$base}");
         }
 
-        // ③ 目标编译文件路径 = md5(模板绝对路径).php
+        return $tplFile;
+    }
+
+    private function isAbsolutePath(string $path): bool
+    {
+        if ($path === '') {
+            return false;
+        }
+        if ($path[0] === '/') {
+            return true;
+        }
+        return strlen($path) >= 3
+            && ctype_alpha($path[0])
+            && $path[1] === ':'
+            && ($path[2] === '/' || $path[2] === '\\');
+    }
+
+    /**
+     * 编译模板（若已编译且未过期则复用）。
+     */
+    public function compile(string $tplFile): string
+    {
+        $tplFile = $this->resolvePath($this->template_dir, $tplFile);
+
         $compileFile = $this->compile_path . DS . md5($tplFile) . '.php';
 
-        // ④ 若未编译过或源文件更新过，则触发编译
         if (!file_exists($compileFile) || filemtime($tplFile) > filemtime($compileFile)) {
             $this->compileFile($tplFile, $compileFile);
         }
@@ -141,7 +157,7 @@ class ViewCompile
         return $content;
     }
     /**
-     * [新增功能] 编译 {function} 和 {call} 语法
+     * 编译 {function} 和 {call} 语法
      */
     private function _compile_custom_tags(string $template_data): string
     {
@@ -153,20 +169,8 @@ class ViewCompile
             '/' . $ld . '\s*function\s+name=(["\'])([\w_]+)\1\s*(.*?)\s*' . $rd . '/i',
             function ($matches) {
                 $name = $matches[2];
-                $defaultsStr = $matches[3];
-                $defaults = $this->_parse_attributes($defaultsStr);
-
-                // 使用闭包(Closure)与引用传递来实现递归支持
-                $php = "<?php\n";
-                $php .= "if (!isset(\$tpl_func_{$name})) {\n";
-                $php .= "    \$tpl_func_{$name} = function(\$__params = []) use (&\$tpl_func_{$name}) {\n";
-                if ($defaults !== 'array()') {
-                    $php .= "        \$__defaults = {$defaults};\n";
-                    $php .= "        \$__params = array_merge(\$__defaults, \$__params);\n";
-                }
-                $php .= "        extract(\$__params, EXTR_OVERWRITE);\n";
-                $php .= "?>";
-                return $php;
+                $defaults = $this->_parse_attributes($matches[3]);
+                return "<?php if (!isset(\$tpl_func_{$name})) { \$tpl_func_{$name} = function(\$__params = []) use (&\$tpl_func_{$name}) { extract(array_merge({$defaults}, \$__params), EXTR_OVERWRITE); ?>";
             },
             $template_data
         );
@@ -183,11 +187,8 @@ class ViewCompile
             '/' . $ld . '\s*call\s+name=(["\'])([\w_]+)\1\s*(.*?)\s*' . $rd . '/i',
             function ($matches) {
                 $name = $matches[2];
-                $paramsStr = $matches[3];
-                $params = $this->_parse_attributes($paramsStr);
-
-                // 将外层的所有环境变量($GLOBALS和局部)合并给调用组件，防止外层变量丢失
-                return "<?php \$tpl_func_{$name}(array_merge(get_defined_vars(), {$params})); ?>";
+                $params = $this->_parse_attributes($matches[3]);
+                return "<?php \$tpl_func_{$name}({$params}); ?>";
             },
             $template_data
         );
@@ -196,26 +197,18 @@ class ViewCompile
     }
 
     /**
-     * [新增辅助方法] 解析模板标签参数转为 PHP array 代码
+     * 解析模板标签参数转为 PHP array 代码
      */
     private function _parse_attributes(string $string): string
     {
-        // 匹配 key=value 键值对，增加了对 [] 的支持
         $pattern = '/\b([-\w]+?)\s*=\s*(\$[\w"\'\]\[\-_>\$]+|"[^"\\\\]*(?:\\\\.[^"\\\\]*)*"|\'[^\'\\\\]*(?:\\\\.[^\'\\\\]*)*\'|\[\]|([->\w]+))/';
+        $params = [];
         if (preg_match_all($pattern, $string, $matches, PREG_SET_ORDER)) {
-            $params = "array(";
             foreach ($matches as $m) {
-                $val = $m[2];
-                // 转换 [] 为标准的 php 数组声明
-                if ($val === '[]') {
-                    $val = 'array()';
-                }
-                $params .= '\'' . $m[1] . "'=>" . $val . ", ";
+                $params[] = "'{$m[1]}' => {$m[2]}";
             }
-            $params .= ")";
-            return $params;
         }
-        return "array()";
+        return "[" . implode(', ', $params) . "]";
     }
 
     /**
@@ -267,7 +260,7 @@ class ViewCompile
             '{foreach\s*(\$[\$\w\.\"\'\[\]_]+?)\s*as\s*(\$[\w\"\'\[\]]+?)\s*=>\s*\$([\w\"\'\[\]]+?)}' => $foreach_inner_before . '<?php foreach( $1 as $2 => $$3 ) : ?>' . $foreach_inner_after,
             '{\/foreach}' => '<?php endforeach; }?>',
             // 15) include 语法
-            '{include\s*file=(.+?)}' => '<?php include $this->compile("'.$dir.'/".$1); ?>',
+            '{include\s*file=(.+?)}' => '<?php include $this->compile($this->viewCompile->resolvePath(\'' . addslashes($dir) . '\', $1)); ?>',
         ];
 
         foreach ($pattern_map as $p => $r) {
@@ -314,13 +307,8 @@ class ViewCompile
             return $sync;
         }
 
-        $pattern_inner = '/\b([-\w]+?)\s*=\s*(\$[\w"\'\]\[\-_>\$]+|"[^"\\\\]*(?:\\\\.[^"\\\\]*)*"|\'[^\'\\\\]*(?:\\\\.[^\'\\\\]*)*\'|([->\w]+))\s*?/';
-        if (preg_match_all($pattern_inner, $matches[2], $matches_inner, PREG_SET_ORDER)) {
-            $params = "array(";
-            foreach ($matches_inner as $m) {
-                $params .= '\'' . $m[1] . "'=>" . $m[2] . ", ";
-            }
-            $params .= ")";
+        $params = $this->_parse_attributes($matches[2]);
+        if ($params !== "[]") {
             return '<?php echo ' . $matches[1] . '(' . $params . ');?>';
         }
         return "";
