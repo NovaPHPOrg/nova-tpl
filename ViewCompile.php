@@ -142,6 +142,10 @@ class ViewCompile
         $content = file_get_contents($tplFile);
         $content = $this->compileContent($content, dirname($tplFile));
         file_put_contents($compileFile, $content);
+        // validate_timestamps=0 时，写完立刻 include 会命中旧 opcache；必须显式作废
+        if (function_exists('opcache_invalidate')) {
+            opcache_invalidate($compileFile, true);
+        }
     }
 
     private function compileContent(string $content, string $dir): string
