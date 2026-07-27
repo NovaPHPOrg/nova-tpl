@@ -117,6 +117,42 @@ nova/plugin/tpl/
 
 ---
 
+## 布局与首屏直出
+
+`init($layout, ...)` 传入非空 `$layout` 时，`asTpl($view, ...)` 实际渲染的是 layout，视图的绝对路径通过 `$__template_file` 注入模板。约定写法：
+
+```text
+{if isset($__template_file) && $__template_file}
+<template id="page">{include file=$__template_file}</template>
+{/if}
+```
+
+`<template>` 内容不进入活动 DOM，因此其中的 `#title` / `#style` / `#container` / `#script` 不会与 layout 自身的锚点冲突；前端 `PjaxUtils.loadUrl()` 首次导航时消费一次该 seed 并移除，省掉首屏那次 PJAX 请求。
+
+控制器侧统一写法：**init 只决定套不套 layout，不提前返回**，页面始终由 action 渲染。
+
+```php
+public function init(): ?Response
+{
+    $this->viewResponse = new ViewResponse();
+    $this->viewResponse->init($this->request->isPjax() ? '' : 'layout', [...]);
+    return null;
+}
+```
+
+layout 需要的变量（菜单、用户信息等）一并放进 `init()` 的数据里，PJAX 时多传无害。
+
+### 模板可用的内置变量
+
+| 变量 | 含义 |
+|------|------|
+| `$__pjax` | 当前是否 PJAX 请求 |
+| `$__debug` | 是否调试模式 |
+| `$__v` | 静态资源版本号（调试模式为时间戳） |
+| `$__template_file` | 套 layout 时的视图绝对路径；未套 layout 为空串 |
+
+---
+
 ## 错误处理
 
 ### HTTP 错误页：`TplHandler`
@@ -128,9 +164,9 @@ nova/plugin/tpl/
 | `/400` … `/504` | 使用内置文案映射 `ERROR_MAP` |
 | `/error` | 从 Session 读取 `error_title`、`error_message`、`error_sub_message`；若无 `nova\plugin\cookie\Session` 类则退回 400 文案 |
 
-**PJAX**（`request()->isPjax() === true`）：直接 `asTpl('error', [...])`，返回 `error/error.tpl` 片段。
+**PJAX**（`request()->isPjax() === true`）：`init('')` 后 `asTpl('error', [...])`，返回 `error/error.tpl` 片段。
 
-**非 PJAX**：`asTpl('layout')`，仅注入 `title` 等初始化数据；页面再通过 PJAX 加载当前 `pathname`，第二次请求通常为 PJAX，从而拿到 `error.tpl` 内容。接入方需保证 `layout.tpl` 与前端 PJAX 逻辑一致。
+**非 PJAX**：`init('layout')` 后同样 `asTpl('error', [...])`，`error.tpl` 被渲染进 `layout.tpl` 的 `<template id="page">`（见下节「首屏直出」），前端首屏无需二次请求。
 
 ### 模板与渲染：`ViewException`
 

@@ -59,7 +59,12 @@ framework/pjax/PjaxUtils.js,
 
 </div>
 
+{if isset($__template_file) && $__template_file}
+<template id="page">{include file=$__template_file}</template>
+{/if}
 
+<script id="script"> </script>
+{* 首屏 seed 是同步消费的，引导脚本必须排在全部锚点之后，否则 #script 还没解析出来 *}
 <script>
     let pjax = new PjaxUtils(function () {
 
@@ -70,7 +75,6 @@ framework/pjax/PjaxUtils.js,
     });
 
 </script>
-<script id="script"> </script>
 </body>
 </html>
 

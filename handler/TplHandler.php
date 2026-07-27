@@ -120,21 +120,17 @@ class TplHandler
      */
     public static function renderErrorResponse(array $errorInfo): Response
     {
+        // 非 PJAX 用 layout 包裹（error.tpl 渲染进 layout 的 <template id="page">，前端零请求）；
+        // PJAX 只返回错误片段。
         $viewResponse = new ViewResponse();
         $viewResponse->init(
-            '',
+            Context::instance()->request()->isPjax() ? '' : 'layout',
             ['title' => Application::SYSTEM_NAME],
             "{",
             "}",
             ROOT_PATH . DS . "nova" . DS . "plugin" . DS . "tpl" . DS . "error" . DS
         );
 
-        // PJAX 请求：只返回错误页面内容
-        if (Context::instance()->request()->isPjax()) {
-            return $viewResponse->asTpl("error", $errorInfo);
-        }
-
-        // 完整页面请求：返回包含布局的页面
-        return $viewResponse->asTpl("layout");
+        return $viewResponse->asTpl("error", $errorInfo);
     }
 }
