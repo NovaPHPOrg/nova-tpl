@@ -80,6 +80,11 @@ class NovaMinify
             return $input;
         }
 
+        // JSON / HTML 等非 JS 载荷：不动。ensureSemicolons + JsMinify 会把它们弄脏
+        if (!self::looksLikeJavascript($input)) {
+            return $input;
+        }
+
         if (self::isMinifiedJs($input)) {
             return $input;
         }
@@ -97,6 +102,53 @@ class NovaMinify
             // 压缩失败时返回原始内容（也要补分号）
             return self::ensureSemicolons($input);
         }
+    }
+
+    /**
+     * 内容是否像可执行 JS。
+     *
+     * 拒绝：JSON（application/json、importmap、ld+json）、HTML/XML 碎片。
+     * 整段合法 JSON 即使在 JS 里也只是表达式，压缩收益为零，跳过更安全。
+     */
+    private static function looksLikeJavascript(string $code): bool
+    {
+        $trim = ltrim($code);
+        if ($trim === '') {
+            return false;
+        }
+
+        $first = $trim[0];
+        if ($first === '<') {
+            return false;
+        }
+
+        if (($first === '{' || $first === '[') && self::isJsonPayload($trim)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static function isJsonPayload(string $s): bool
+    {
+        json_decode($s);
+        return json_last_error() === JSON_ERROR_NONE;
+    }
+
+    /**
+     * &lt;script&gt; 的 type 是否表示可执行 JS。
+     * 无 type / module / *javascript* / *ecmascript* → 是；application/json、importmap 等 → 否。
+     */
+    private static function isExecutableJsScript(string $attrs): bool
+    {
+        if (!preg_match('/\btype\s*=\s*(["\']?)([^"\'>\s]+)\1/i', $attrs, $m)) {
+            return true;
+        }
+
+        $type = strtolower($m[2]);
+        return $type === 'module'
+            || str_contains($type, 'javascript')
+            || str_contains($type, 'ecmascript');
     }
 
     public static function isMinifiedJs(string $input)
@@ -340,12 +392,15 @@ class NovaMinify
             );
         }
 
-        // 压缩 <script> 标签内的 JS
+        // 只压缩可执行 JS 的 <script>；application/json、importmap、ld+json 等原样保留
         if (str_contains($input, '</script>')) {
             $input = preg_replace_callback(
                 '#<script(.*?)>(.*?)</script>#is',
                 function ($matches) {
-                    return '<script' . $matches[1] . '>' . self::minifyJs($matches[2]) . '</script>';
+                    $body = self::isExecutableJsScript($matches[1])
+                        ? self::minifyJs($matches[2])
+                        : $matches[2];
+                    return '<script' . $matches[1] . '>' . $body . '</script>';
                 },
                 $input
             );
