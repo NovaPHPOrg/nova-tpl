@@ -93,23 +93,23 @@ class TplHandler
     /**
      * 处理错误页面渲染
      *
-     * @param  string           $uri 请求URI
+     * 只认根路径 `/404`、`/503`、`/error` 等，禁止后缀匹配。
+     * 否则 `/domain/api/doc/503`、`/docs/404` 这类合法资源会被误杀成错误页。
+     *
+     * @param  string           $uri 请求URI（已去掉 query string）
      * @return void
      * @throws AppExitException 抛出包含错误页面响应的异常
      */
     public static function handleErrorPage(string $uri): void
     {
-        // 检查URI是否匹配错误状态码
-        foreach (self::ERROR_MAP as $code => $errorInfo) {
-            if (!str_ends_with($uri, "/{$code}")) {
-                continue;
-            }
-
-            // 渲染错误页面
-            throw new AppExitException(
-                self::renderErrorResponse($errorInfo)
-            );
+        $code = ltrim($uri, '/');
+        if ($code === '' || str_contains($code, '/') || !isset(self::ERROR_MAP[$code])) {
+            return;
         }
+
+        throw new AppExitException(
+            self::renderErrorResponse(self::ERROR_MAP[$code])
+        );
     }
 
     /**
