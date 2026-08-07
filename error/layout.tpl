@@ -60,7 +60,9 @@ framework/pjax/PjaxUtils.js,
 </div>
 
 {if isset($__template_file) && $__template_file}
-<template id="page">{include file=$__template_file}</template>
+    <article id="page" hidden>
+        {include file=$__template_file}
+    </article>
 {/if}
 
 <script id="script"> </script>
