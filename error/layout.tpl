@@ -18,13 +18,15 @@
             height: 95vh; /* 或自定义高度 */
         }
     </style>
+    <script src="/static/bundle?file=
+    framework/libs/vhcheck.min.js,
+    framework/libs/mdui.global.min.js
+    &type=js&v={$__v}"></script>
 </head>
 
 <body>
 
 <script src="/static/bundle?file=
-    framework/libs/vhcheck.min.js,
-    framework/libs/mdui.global.min.js,
     framework/bootloader.js,
     framework/utils/Loading.js,
     framework/utils/Logger.js,
