@@ -124,10 +124,17 @@ class StaticHandler
             );
         }
 
-        // 生成ETag用于缓存（包含文件列表和版本）
-        // 优化：使用更快的哈希算法（xxh64比md5快3-5倍）
-        $hashData = implode('|', $fileList) . $version;
-        $filesHash = in_array('xxh64', hash_algos()) ? hash('xxh64', $hashData) : md5($hashData);
+        // ETag 必须跟文件内容变化，否则改 CSS/JS 但 version 不变时会命中 10 天脏缓存
+        $mtime = 0;
+        $staticRoot = ROOT_PATH . '/app/static/';
+        foreach ($fileList as $relPath) {
+            $t = @filemtime($staticRoot . $relPath);
+            if ($t !== false && $t > $mtime) {
+                $mtime = $t;
+            }
+        }
+        $hashData = implode('|', $fileList) . '|' . $version . '|' . $mtime;
+        $filesHash = in_array('xxh64', hash_algos(), true) ? hash('xxh64', $hashData) : md5($hashData);
         $etag = '"bundle-' . $filesHash . '"';
 
         // 检查客户端缓存
